@@ -30,6 +30,6 @@ const listDirs = async (directory) => {
 const images = await listDirs(inFolder)
 
 // compress
-for (image of images) {
+for (const image of images) {
   $`tar -zcvf ${path.join(outFolder, `${image}.tgz`)} ${path.join(inFolder, image)}`
 }

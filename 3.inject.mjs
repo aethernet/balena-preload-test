@@ -76,4 +76,4 @@ const mergedRepositories = repositories.reduce((acc, repository) => mergeReposit
 await $`echo ${JSON.stringify(mergedRepositories)} > ${path.join(resinDataDockerPath, 'image', 'overlay2', 'repositories.json')}`
 
 // inject apps.json
-await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataPath, 'apps.json')}`
+//await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataPath, 'apps.json')}`

@@ -22,6 +22,7 @@ await $`mkdir -p ${workFolder}`
 await $`mkdir -p ${outFolder}`
 
 const targetState = {
+  "name": "morning-shape",
   "pinDevice": false,
   "config": {
     "RESIN_SUPERVISOR_DELTA_VERSION": "3",
