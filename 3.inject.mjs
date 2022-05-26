@@ -27,7 +27,7 @@
  */
 
 const resinDataDockerPath = '/Volumes/resin-data/docker'
-const resinDataPath = 'Volumes/resin-data'
+const resinDataPath = '/Volumes/resin-data'
 const inFolder = '/tmp/preloadTest/out'
 
 /** 
