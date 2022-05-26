@@ -27,6 +27,7 @@
  */
 
 const resinDataDockerPath = '/Volumes/resin-data/docker'
+const resinDataPath = 'Volumes/resin-data'
 const inFolder = '/tmp/preloadTest/out'
 
 /** 
@@ -75,4 +76,4 @@ const mergedRepositories = repositories.reduce((acc, repository) => mergeReposit
 await $`echo ${JSON.stringify(mergedRepositories)} > ${path.join(resinDataDockerPath, 'image', 'overlay2', 'repositories.json')}`
 
 // inject apps.json
-await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataDockerPath, 'apps.json')}`
+await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataPath, 'apps.json')}`
