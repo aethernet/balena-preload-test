@@ -1,5 +1,16 @@
 #!/usr/bin/env zx
 
+/** 
+ * Here we create all the assets so they can be copied into the balaneos image 
+ * Each images is it's own folder
+ * Apps.json is forwarded as it
+ * 
+ * FIXME :
+ * - We need to generate "short name" for the layers and link them up to the actual layer. This mechanism is to prevent `mount` to fail due to too long parameters.
+ * Those `short names` are generated in a rather crude way, which is not robust against collision. A better solution should be found.
+ * 
+*/
+
 const tmpFolder = '/tmp/preloadTest'
 const inFolder = path.join(tmpFolder, 'work')
 const outFolder = path.join(tmpFolder, 'out')
@@ -22,52 +33,67 @@ const createLSymlink = async ({layerName, outFolder}) => {
   // await $`ln -s ${path.join(outFolder, layerName, 'diff')} ${path.join(outFolder, 'l', linkShort)}`
 }
 
-/** Read manifest */
-const manifest = await fs.readJSON(path.join(inFolder, 'manifest.json'))
+const prepareImage = async ({imageFolder, imageName, imageTag, outFolder}) => {
+  /** Read manifest */
+  const manifest = await fs.readJSON(path.join(imageFolder, 'manifest.json'))
 
-const mainLayerSha256 = manifest.config.digest.replace('sha256:', '')
+  const mainLayerSha256 = manifest.config.digest.replace('sha256:', '')
 
-const layersSha256 = manifest.layers.map(layer => layer.digest?.replace('sha256:', ''))
+  const layersSha256 = manifest.layers.map(layer => layer.digest?.replace('sha256:', ''))
 
-/** Create folder structure and uncompress tgz to diff folders */
+  /** Create folder structure and uncompress tgz to diff folders */
 
-// Create the `l` directory
-await $`mkdir -p ${path.join(outFolder, 'overlay2', 'l')}`
+  // Create the `l` directory
+  await $`mkdir -p ${path.join(outFolder, 'overlay2', 'l')}`
 
-// main image layer has the image manifest and a few other references
-await $`mkdir -p ${path.join(outFolder, 'overlay2', mainLayerSha256)}`
-await $`touch ${path.join(outFolder, 'overlay2', mainLayerSha256, 'commited')}`
-await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'work')}`
-await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'diff')}`
-await createLSymlink({layerName: mainLayerSha256, outFolder: path.join(outFolder, 'overlay2')})
+  // main image layer has the image manifest and a few other references
+  await $`mkdir -p ${path.join(outFolder, 'overlay2', mainLayerSha256)}`
+  await $`touch ${path.join(outFolder, 'overlay2', mainLayerSha256, 'commited')}`
+  await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'work')}`
+  await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'diff')}`
+  await createLSymlink({layerName: mainLayerSha256, outFolder: path.join(outFolder, 'overlay2')})
 
-for (let layer of layersSha256) {
-  await $`mkdir -p ${path.join(outFolder, 'overlay2', layer, 'diff')}`
-  await $`tar -zxvf ${path.join(inFolder, layer)} -C ${path.join(outFolder, 'overlay2', layer, 'diff')}`
-  await createLSymlink({layerName: layer, outFolder: path.join(outFolder, 'overlay2')})
+  for (let layer of layersSha256) {
+    await $`mkdir -p ${path.join(outFolder, 'overlay2', layer, 'diff')}`
+    await $`tar -zxvf ${path.join(imageFolder, layer)} -C ${path.join(outFolder, 'overlay2', layer, 'diff')}`
+    await createLSymlink({layerName: layer, outFolder: path.join(outFolder, 'overlay2')})
+  }
+
+  /** Prepare repositories.json which we be merged with the existing repositories */
+  const repositories = {
+    Repositories: {
+      [imageName]: {
+        [`${imageName}:latest`]: `sha256:${mainLayerSha256}`,
+        [`${imageName}@${imageTag}`]: `sha256:${mainLayerSha256}`
+      }
+    }
+  }
+  
+  await $`mkdir -p ${path.join(outFolder, 'image', 'overlay2')}`
+  await $`echo ${JSON.stringify(repositories)} > ${path.join(outFolder, 'image', 'overlay2', 'repositories.json')}`
 }
 
-/** Produce portion of repositories.json which we'll merge on next stage 
- * FIXME: registry address needs to come from somewhere and will be the name of the image
- * It's probably important it stays consistent for updates to work
- * Same for the sha256 of the latest commit
- * 
- * Note that this hardcoded version comes from a cli preloaded image
-*/
-const repositories = {
-  'Repositories': {
-    'registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5': {
-      'registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5:latest': `sha256:${mainLayerSha256}`,
-      'registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5@sha256:0ae9a712a8c32ac04b91d659a9bc6d4bb2e76453aaf3cfaf036f279262f1f100': `sha256:${mainLayerSha256}`
-    },
-  },
+// prepare all images we need to import
+
+/** utils: return all subdirectory of arg (no files) */
+const listDirs = async (directory) => {
+    const elements = await fs.readdir(directory, { withFileTypes: true })
+    return elements
+      .filter(element => !element.isFile())
+      .map(element => element.name)
 }
 
-await $`mkdir -p ${path.join(outFolder, 'image', 'overlay2')}`
-await $`echo ${JSON.stringify(repositories)} > ${path.join(outFolder, 'image', 'overlay2', 'repositories.json')}`
+const images = await listDirs(inFolder)
 
-/** 
- * Produces apps.json (no merge necessary) 
- * This is the target state of the supervisor once our app runs
- * No need to deal with that now, first step is to see if the image is properly loaded and available if we want to run it :
- * */
+for (const image of images) {
+  const imageName = `registry2.balena-cloud.com/v2/${image.split('@')[0]}`
+  await prepareImage({
+    imageName,
+    imageTag: image.split('@').reverse()[0],
+    imageFolder: path.join(inFolder, image),
+    outFolder: path.join(outFolder, image)
+  })
+}
+
+// copy apps.json
+await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(outFolder, 'apps.json')}`
