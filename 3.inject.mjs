@@ -59,10 +59,13 @@ const images = await listDirs(inFolder)
 const osRepositories = await fs.readJSON(path.join(resinDataDockerPath, 'image', 'overlay2', 'repositories.json'))
 const repositories = [osRepositories]
 
+const directories = []
+
 for (const image of images) {
   const imgPath = path.join(inFolder, image)
   
   // copy layers on SD
+
   await $`cp -Rf ${path.join(imgPath, 'overlay2')}/ ${path.join(resinDataDockerPath, 'overlay2')}`
   
   // add repositories to the list of repositories to be merged
@@ -76,4 +79,4 @@ const mergedRepositories = repositories.reduce((acc, repository) => mergeReposit
 await $`echo ${JSON.stringify(mergedRepositories)} > ${path.join(resinDataDockerPath, 'image', 'overlay2', 'repositories.json')}`
 
 // inject apps.json
-//await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataPath, 'apps.json')}`
+// await $`cp ${path.join(inFolder, 'apps.json')} ${path.join(resinDataPath, 'apps.json')}`

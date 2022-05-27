@@ -26,11 +26,11 @@ await $`mkdir ${outFolder}`
  * FIXME: PROTOTYPE : this method is not robust and needs to be replaced by a proper hash function, collision is a real threat here
  * */
 const createLSymlink = async ({layerName, outFolder}) => {
-  const linkShort = [...Array(16).keys()].map(() => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 34)]).join('')
+  const linkShort = [...Array(26).keys()].map(() => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 34)]).join('')
   // add a `link` file in the layer folder with the ref of the link
   await $`echo ${linkShort} > ${path.join(outFolder, layerName, 'link')}`
   // add a symlink in the `l` folder pointing back to the layer diff folder
-  // await $`ln -s ${path.join(outFolder, layerName, 'diff')} ${path.join(outFolder, 'l', linkShort)}`
+  await $`ln -s ${path.join(outFolder, layerName, 'diff')} ${path.join(outFolder, 'l', linkShort)}`
 }
 
 const prepareImage = async ({imageFolder, imageName, imageTag, outFolder}) => {
