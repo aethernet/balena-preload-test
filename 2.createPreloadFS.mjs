@@ -31,6 +31,8 @@ const createLSymlink = async ({layerName, outFolder}) => {
   await $`echo ${linkShort} > ${path.join(outFolder, layerName, 'link')}`
   // add a symlink in the `l` folder pointing back to the layer diff folder
   await $`ln -s ${path.join(outFolder, layerName, 'diff')} ${path.join(outFolder, 'l', linkShort)}`
+
+  return linkShort
 }
 
 const prepareImage = async ({imageFolder, imageName, imageTag, outFolder}) => {
@@ -51,14 +53,30 @@ const prepareImage = async ({imageFolder, imageName, imageTag, outFolder}) => {
   await $`touch ${path.join(outFolder, 'overlay2', mainLayerSha256, 'commited')}`
   await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'work')}`
   await $`mkdir ${path.join(outFolder, 'overlay2', mainLayerSha256, 'diff')}`
+  await $`mkdir -p ${path.join(outFolder, 'image', 'overlay2', 'imagedb', 'content', 'sha256')}`
+  await $`cp ${path.join(imageFolder, mainLayerSha256)} ${path.join(outFolder, 'image', 'overlay2', 'imagedb', 'content', 'sha256', mainLayerSha256)}`
   await createLSymlink({layerName: mainLayerSha256, outFolder: path.join(outFolder, 'overlay2')})
 
-  for (let layer of layersSha256) {
+  // prepare the lower file that will be populate with layers links
+  const lower = []
+
+  // all other layers
+  for (const layer of layersSha256) {
     await $`mkdir -p ${path.join(outFolder, 'overlay2', layer, 'diff')}`
     await $`tar -zxvf ${path.join(imageFolder, layer)} -C ${path.join(outFolder, 'overlay2', layer, 'diff')}`
-    await createLSymlink({layerName: layer, outFolder: path.join(outFolder, 'overlay2')})
+    const link = await createLSymlink({layerName: layer, outFolder: path.join(outFolder, 'overlay2')})
+    lower.push(`l/${link}`)
   }
+  
+  // add the `lower` file containing the full chain of lower overlays for the main folder
+  await $`echo ${lower.join(':')} > ${path.join(outFolder, 'overlay2', mainLayerSha256, 'lower')}`
 
+  // same of subsequent folders
+  for (const layer of layersSha256) {
+    lower.shift()
+    await $`echo ${lower.join(':')} > ${path.join(outFolder, 'overlay2', layer, 'lower')}`
+  }
+  
   /** Prepare repositories.json which we be merged with the existing repositories */
   const repositories = {
     Repositories: {

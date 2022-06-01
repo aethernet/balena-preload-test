@@ -67,6 +67,7 @@ for (const image of images) {
   // copy layers on SD
 
   await $`cp -Rf ${path.join(imgPath, 'overlay2')}/ ${path.join(resinDataDockerPath, 'overlay2')}`
+  await $`cp -Rf ${path.join(imgPath, 'image')}/ ${path.join(resinDataDockerPath, 'image')}`
   
   // add repositories to the list of repositories to be merged
   repositories.push(await fs.readJSON(path.join(imgPath, 'image', 'overlay2', 'repositories.json')))
