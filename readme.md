@@ -5,18 +5,15 @@
 1. Connect a device to a fleet or build some images
 2. SSH to the host
 3. Compress the whole `/var/lib/docker` (ie : `tar -zcvf /tmp/docker.tgz /var/lib/docker` )
-4. List images available on the device (ie: `balena-engine images`)
-5. Inspect image of interest (ie : `balena-engine inspect *imageIdOrName1* *imageIdOrName2* *imageIdOrNameN* > /tmp/inspect.json`) if you want to export/inject a whole app, you need to specify all images related to that app, beware to exlude the supervisor related one)
-6. Exfiltrate archived `var/lib/docker` and inspect.json (ie : `curl -T /tmp/docker.tgz https://transfer.sh/docker.tgz`)
-7. Uncompress `var/lib/docker` in the `in` folder on your dev machine (i.e. `tar -zxvf /tmp/docker.tgz` )
-8. Copy `inspect.json` in the `in` folder on your dev machine
-9. Copy a valid `apps.json` for the fleet to preload in the `in` folder (you can get one from the device dashboard -> diagnostic -> supervisor state), clean it up to keep only the images you're going to inject and only keep the content of `local` (cf section below with details)
+4. Exfiltrate archived `var/lib/docker` and inspect.json (ie : `curl -T /tmp/docker.tgz https://transfer.sh/docker.tgz`)
+5. Uncompress `var/lib/docker` in the `in` folder on your dev machine (i.e. `tar -zxvf /tmp/docker.tgz` )
+6. Copy a valid `apps.json` for the fleet to preload in the `in` folder (you can get one from the device dashboard -> diagnostic -> supervisor state), clean it up to keep only the images you're going to inject and only keep the content of `local` (cf section below with details)
 
 ## Run
 
-1. edit `extractApp.mjs` to include the `full id` of each images you want to extract / inject.
-2. run `extractApp.mjs`
+1. run `extractApp.mjs`
 
+- Images `name` will ba taken from the `apps.json`
 - All `layers` and metadata for all images will be extracted to the `out` folder.
 - A snippet of `repositories.json` will be copied for each images as `_imageHash_.repositories.json`
 
@@ -26,9 +23,9 @@
 3. Mount the sd card (/!\ ext4 partitions, you'll need extra drivers for mac or windows) (i.e. `Paragon ExtFS for mac` (test licence works fine for 10 days))
 4. Run `inject.mjs` with parameters pointing to the mounted `resin-data` drive. (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional, and if set will copy `static_ip` file to configure ethernet static ip address.
 5. Unmount sd card
-6. Insert in device and boot up
-7. Connect to ssh (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
-7. Test that everything is running as it should (`balena-engine ps` should returns running app containers)
+6. Insert sd in device and boot up
+7. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
+7. Test that everything is running as it should (`balena-engine ps` should returns all your containers)
 
 ## Troubleshooting
 
@@ -66,29 +63,25 @@ To transplant an image we need to move :
 - `image/overlay2/repositories.json` (partial of a json, which will have to be merged with existing one when injecting)
 
 ## How to track those files
-Doing a `docker inspect _image Name Or Id_` will output a json with informations about the layers (`RootFs`) and overlays (`GraphDrivers`).
+Manifest will list `diff-id` for each layers.
+But on the file system, the folder will be named using `chainId`.
 
-Overlays are quite easy to track as `GraphDriver.Data.LowerDir` is a string listing `diff` folders of all the `overlays` separated by a `:`. It's just a matter of splitting and cleaning the string.
+`chainId(n)` is `sha256(chainId(n-1) + ' ' + diffId(n))`
+Except for highest layer as that one has no parent so for that one `chainId` = `diffId`.
 
-Diff Layers on the other hands are more complex to track as they're listed as `diffId` while they're stored on disk in `image/overlay2/layerdb/` using `chainId`.
+Each of those layer has a `parent` file which contains the `chainId` of the parent, this can be used for extra check.
 
-For the highest layer (first in the list) chainId = diffId, so that one is easy to locate.
+Each of those layers also contains a `cacheId` file containing the hash of the corresponding overlay, using that file we can find the corresponding `overlay2` folder.
 
-For all other layers : `chainId(n)` is `sha256(diffId(n) + ' ' + chainId(n-1))`. 
-Hopefully each of those layers (directory) contains a `parent` file which contains the chainId of the layer above them.
-
-So starting with the highest layer (no parent), we can scan the layers to find the one who have it as a `parent`, repeat with layer2, ... until we have them all (we know the quantity in advance).
-
-Each of those layers also contains a `cacheId` file containing the hash of the corresponding overlay. This can be used as a security to ensure we have all the right layers and corresponding overlays.
-
-### Better solution to find the layers :
-TODO: As we have the list of diffId and the algorithm to hash their chainId, we should simply compute it instead of searching for which one have the right parent.
+In each `overlay2` folder we have a `link` file which contains the "short name" used in the `l` folder to create a `symlink` back the the `overlay2/_id_/diff` folder. Those symlinks are used to limit the size of the `mount` parameter used when mounting the overlays together.
 
 ## Apps.json
 This file contains instruction about the target state of the device for the `balena-supervisor`.
 There's no good way of getting it yet (cf previous notes).
 
 It has to be copied at the root of the `resin-data` partition.
+
+Note that starting with `v13` of `supervisor`, supervisor expects an `apps.json` `v3`, prior is `v2`.
 
 ## repositories.json
 That file contains the relation between `image tags` (aka names) and `image id`.
