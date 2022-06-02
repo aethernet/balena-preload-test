@@ -17,6 +17,8 @@ const imagesId = images
 
 // clean out folder
 await $`rm -rf ${outPath}`
+await $`mkdir -p ${outPath}`
+await $`touch ${path.join(outPath, '.gitkeep')}`
 
 /** Run extract for each image in the app */
 for(let image of imagesId) {
