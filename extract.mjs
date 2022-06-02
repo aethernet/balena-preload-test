@@ -54,42 +54,36 @@ for (let key = 0; key < inspect.rootfs.diff_ids.length; key++) {
 }
 
 /**
- * get overlays2 folder list
- * */
-const overlays2 = [
-  inspect.GraphDriver.Data.UpperDir.split("/").reverse()[1],
-  inspect.GraphDriver.Data.LowerDir.split(":").map((overlay) => overlay.split("/").reverse()[1]),
-].flat()
-
-/**
+ * get overlays2 folder ids from layers `cache-id` file
  * get `links` for each overlay2, those are symlinks (shorter names) from the `/var/lib/docker/overlay2/l` folder pointing back to a `overlay2/_sha256_/diff`
+ * 
  * those links are stored as plain text in each `/var/lib/docker/overlay2/_sha256_/link` file
- */
+ * */
+const overlays2 = []
 const ls = []
-for (const overlay of overlays2) {
-  const l = await $`cat ${path.join(basePath, "overlay2", overlay, "link")}`
-  ls.push(l.stdout)
-}
-
-/** Double check that we have all layers using the `cache-id` file of the layer */
-if (layers.length !== overlays2.length) throw new Error(`Overlay2 and Layerdb doens't contains the same number of folder : ${overlays2.length} vs ${layers.length}`)
-
 for (let layer of layers) {
-  const cacheId = await $`cat ${path.join(imagePath, "layerdb", "sha256", layer, "cache-id")}`
-  if(!overlays2.map(id => `${id}`).includes(`${cacheId}`)) throw new Error(`Overlay2 doens't match cache id of layer ${cacheId}, ${overlays2.indexOf(cacheId)}`)
+  const overlay = await $`cat ${path.join(imagePath, "layerdb", "sha256", layer, "cache-id")}`
+  overlays2.push(overlay.stdout)
+  const l = await $`cat ${path.join(basePath, "overlay2", overlay.stdout, "link")}`
+  ls.push(l.stdout)
 }
 
 /**
  * extract snippet from /var/lib/docker/image/overlay2/repositories.json
  * this extract will have to be merged with the existing repositories.json when injecting
+ * 
+ * we might have more than one tag for each image id
  */
 
 const repositories = await fs.readJson(path.join(imagePath, "repositories.json"))
 
 const repositoriesExtract = {}
 
-for (let name of imageNames) {
-  repositoriesExtract[name] = repositories.Repositories[name]
+for (const repo in repositories.Repositories) {
+  for (const tag in repositories.Repositories[repo]) {
+    if(repositories.Repositories[repo][tag] === `sha256:${imageId}`)
+    repositoriesExtract[repo] = repositories.Repositories[repo]
+  }
 }
 
 /** copy everything we identified to `out` folder */
