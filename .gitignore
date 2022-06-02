@@ -1,5 +1,5 @@
 api_key
-balenaos5g.img.zip
+*.img.zip
 .DS_STORE
 in/*
 out/*
