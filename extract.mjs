@@ -1,9 +1,15 @@
 #!/usr/bin/env zx
 
+import crypto from 'crypto'
+
 /**
- * parameter : name of the image we're looking for with tag; can be provided using `--image` argument
+ * parameter : name of the image we're looking for with tag; provided using `--image` argument
  */
 const imageId = argv.image
+
+if(!imageId) {
+  throw new Error("No Image Id provided; please use `--image` to pass the id of the image you want to extract")
+}
 
 // constant
 const inPath = path.join(__dirname, "in")
@@ -14,14 +20,38 @@ const outPath = path.join(__dirname, "out")
 const outBasePath = path.join(outPath, "docker")
 const outImagePath = path.join(outBasePath, "image", "overlay2")
 
-// inspect.json has to be copied from host, in a "real world" scenario, this would directly come from "docker inspect _image id or name_"
-const inspectRaw = await fs.readJson(path.join(__dirname, "in", "inspect.json"))
-const inspect = inspectRaw.find(image => image.Id === `sha256:${imageId}`)
+// // inspect.json has to be copied from host, in a "real world" scenario, this would directly come from "docker inspect _image id or name_"
+// const inspectRaw = await fs.readJson(path.join(__dirname, "in", "inspect.json"))
+// const inspect = inspectRaw.find(image => image.Id === `sha256:${imageId}`)
 
-if (`sha256:${imageId}` !== inspect.Id) throw new Error(`Image ids doesn't match ${imageId} ${inspect.Id}`)
+// get the manifest for the image
+const inspect = await fs.readJson(path.join(imagePath, 'imagedb', 'content', 'sha256', imageId))
 
-// (split on @ in case it's tag by a commit, or : in case it's tag with a version (i.e. latest))
-const imageNames = inspect.RepoTags.map((name) => name.split("@")[0].split(":")[0])
+/**
+ * get layerdb first element (the one where diffId == pathId)
+ *
+ * Notes about how they're built :
+ * Layers in the json are labbeled using diffId (sha256 based on the content of the uncompressed diff folder)
+ * Layers in the folder are named using pathId which is a sha256 of a string composed of the diffId of the layer, a space, and the pathId of the parent layer
+ * As the highest layer has no parent diffid == pathid.
+ * 
+ * We'll compute each chainId and double check using the `parent` file contained into the folder (it should contains the `chainId` of the parent layer)
+ * 
+ */
+const layers = []
+
+for (let key = 0; key < inspect.rootfs.diff_ids.length; key++) {
+  const diffId = inspect.rootfs.diff_ids[key]
+
+  // first layer has no parent so chainId = diffId
+  if(key === 0) {
+    layers.push(diffId.split(':')[1])
+    continue
+  }
+
+  // all other layers chainId is a sha256 hash of `chainId(n-1) diffId(n)`
+  layers.push(crypto.createHash('sha256').update(`sha256:${layers[key-1]} ${diffId}`).digest('hex'))
+}
 
 /**
  * get overlays2 folder list
@@ -39,23 +69,6 @@ const ls = []
 for (const overlay of overlays2) {
   const l = await $`cat ${path.join(basePath, "overlay2", overlay, "link")}`
   ls.push(l.stdout)
-}
-
-/**
- * get layerdb first element (the one where diffId == pathId)
- *
- * Notes about how they're built :
- * Layers in the json are labbeled using diffId (sha256 based on the content of the uncompressed diff folder)
- * Layers in the folder are named using pathId which is a sha256 of a string composed of the diffId of the layer, a space, and the pathId of the parent layer
- * As the highest layer has no parent diffid == pathid. This is our entry point
- * Each layer on disk has a "parent" file which contains the pathId of the parent, that's how we navigate into this mess
- */
-const layers = [inspect.RootFS.Layers[0].split(":")[1]]
-
-for (let i = 0; i < inspect.RootFS.Layers.length - 1; i++) {
-  // find which folder on disk has previous layerId as parent; because of zx limitation we offload the search to a bash script
-  const newLayer = await $`./findLayerByParent.sh ${path.join(imagePath, "layerdb", "sha256")} ${layers[i]}`
-  layers.push(newLayer.stdout.split("/").reverse()[1])
 }
 
 /** Double check that we have all layers using the `cache-id` file of the layer */
