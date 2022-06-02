@@ -1,5 +1,6 @@
 api_key
 *.img.zip
+*.img
 .DS_STORE
 in/*
 out/*
