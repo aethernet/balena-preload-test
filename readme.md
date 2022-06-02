@@ -18,6 +18,7 @@
 - A snippet of `repositories.json` will be copied for each images as `_imageHash_.repositories.json`
 
 ## Inject
+### by copying on sd
 
 1. Burn a balena os image with free space to a sd card using etcher (cf specific readme)
 3. Mount the sd card (/!\ ext4 partitions, you'll need extra drivers for mac or windows) (i.e. `Paragon ExtFS for mac` (test licence works fine for 10 days))
@@ -25,6 +26,15 @@
 5. Unmount sd card
 6. Insert sd in device and boot up
 7. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
+7. Test that everything is running as it should (`balena-engine ps` should returns all your containers)
+
+### by copying to img
+1. Mount the two partitions (`resin-data` and `resin-boot`) from balenaos inflated, expanded image to the host
+2. Run `inject.mjs` with parameters pointing to the mounted `resin-data` (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional, and if set will copy `static_ip` file to configure ethernet static ip address.
+3. Unmount all the partitions from the image
+4. Burn the image to a sd card using etcher
+5. Insert sd in device and boot up
+6. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
 7. Test that everything is running as it should (`balena-engine ps` should returns all your containers)
 
 ## Troubleshooting
