@@ -5,3 +5,5 @@ api_key
 in/*
 out/*
 !.gitkeep
+out_injectable
+*.tgz

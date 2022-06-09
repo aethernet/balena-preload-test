@@ -5,39 +5,67 @@
 1. Connect a device to a fleet or build some images
 2. SSH to the host
 3. Compress the whole `/var/lib/docker` (ie : `tar -zcvf /tmp/docker.tgz /var/lib/docker` )
-4. Exfiltrate archived `var/lib/docker` and inspect.json (ie : `curl -T /tmp/docker.tgz https://transfer.sh/docker.tgz`)
-5. Uncompress `var/lib/docker` in the `in` folder on your dev machine (i.e. `tar -zxvf /tmp/docker.tgz` )
-6. Copy a valid `apps.json` for the fleet to preload in the `in` folder (you can get one from the device dashboard -> diagnostic -> supervisor state), clean it up to keep only the images you're going to inject and only keep the content of `local` (cf section below with details)
+4. Exfiltrate archived `var/lib/docker` (ie : `curl -T /tmp/docker.tgz https://transfer.sh/docker.tgz`)
+5. Uncompress `var/lib/docker` in the `in` folder (from this repo) on your dev machine (i.e. `tar -zxvf /tmp/docker.tgz` )
+6. Put a valid `apps.json` v3 for the fleet to preload in the `in` folder (cf `get apps.json` section below)
 
-## Run
+### Get `apps.json`
+
+We need a v3 of `apps.json` which will only work with `supervisor v13+` (fairly recent version of belena os at the time of writing).
+
+To get that for a fleet you need a provisioned device on the fleet (which should be the case if you followed the rest prepare instructions), note that the device online status doesn't matter.
+
+Go to the dashboard, open your browser dev tools, go to the network panel, browse to the device -> diagnostic -> supervisor state. Search the `xhr` call for one that looks like 
+`https://api.balena-cloud.com/device/v2/_deviceid_/state` (note that device `id` is not equal to `uuid`).
+
+Replace `v2` by `v3` and run it back. You can do that with a fetch in the dev tool console, or with curl
+
+`curl -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>"  -X GET https://api.balena-cloud.com/device/v3/<DEVICE_ID>/state`
+
+Replace `<TOKEN>` with your balena token (you can find it in `~/.balena/token` if you're logged in from the cli) and `<DEVICE_ID>` with the device id.
+
+You'll get a json, containing a `[_UUID_]: {apps: {name: '', ...}, config: {...}}`, which is not the same format as `apps.json`.
+
+You need to remove the first `key` and get the contnet one level up so it looks like :
+`{apps: {...}, config: {...}}` and remove the `apps.name`.
+
+#### TODO: 
+- automate this whole thing (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the device).
+
+## Extract
 
 1. run `extractApp.mjs`
 
-- Images `name` will ba taken from the `apps.json`
+- Images `name` will be taken from the `apps.json` and translation to image hash will be done using the `repositories.json` from the assets
 - All `layers` and metadata for all images will be extracted to the `out` folder.
-- A snippet of `repositories.json` will be copied for each images as `_imageHash_.repositories.json`
+- A snippet of `repositories.json` will be copied for each images as `_imageHash_.repositories.json` in the out folder
+- `apps.json` will be copied from `in` to `out`
 
-## Inject
+## Inject to a balenaos `.img`
 
-### by copying on sd
-
-1. Burn a balena os image with free space to a sd card using etcher (cf specific readme)
-2. Mount the sd card (/!\ ext4 partitions, you'll need extra drivers for mac or windows) (i.e. `Paragon ExtFS for mac` (test licence works fine for 10 days))
-3. Run `inject.mjs` with parameters pointing to the mounted `resin-data` drive. (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional, and if set will copy `static_ip` file to configure ethernet static ip address.
-4. Unmount sd card
-5. Insert sd in device and boot up
-6. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
-7. Test that everything is running as it should (`balena-engine ps` should returns all your containers)
-
-### by copying to img
-
-1. Mount the two partitions (`resin-data` and `resin-boot`) from balenaos inflated, expanded image to the host
-2. Run `inject.mjs` with parameters pointing to the mounted `resin-data` (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional, and if set will copy `static_ip` file to configure ethernet static ip address.
+1. Mount the two partitions (`resin-data` and `resin-boot`) from balenaos inflated, expanded image (cf `resizeBalenaOsPartition.md` for details)
+2. Run `inject.mjs` with parameters pointing to the mounted `resin-data` (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional (cf `inject settings` section below)
 3. Unmount all the partitions from the image
 4. Burn the image to a sd card using etcher
 5. Insert sd in device and boot up
 6. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
-7. Test that everything is running as it should (`balena-engine ps` should returns all your containers)
+7. Test that everything is running as it should (`balena-engine ps` should returns all your containers running, `balena-engine images` should list all images (apps + supervisor))
+
+### Inject Settings
+
+You can add two optional settings file :
+  - `config.json` (in the `in` folder)
+  - `static_ip` (in the `root` folder of this project)
+
+If `resin-boot` partition is mounted and provided and one of those optional files are availble, they will be injected in the boot partition (at root for `config.json` and in `system-connectons` for `static_ip`).
+
+#### `config.json`
+You can get `config.json` for your fleet from the balena cloud dashboard. Add a device to the fleet and download the `_appname_config.json` file instead of the os `.img.zip` (be sure to select `dev` and not `prod`), then rename the file and drop it in the `in` folder. This way you can reuse the same expanded os base image while testing different fleets.
+
+#### `static_ip`
+It's a simple ethernet static ip configuration file which will configure `ethernet` to a static 10.0.0.1/24 ip. The idea is that you can easily configure your laptop to `10.0.0.*/24` run an ethernet cable between the two and get access to the device without the device connected to the internet.
+
+This is to prevent the device to register itself to the cloud and get a new target state. It means if the device has its services running you're sure it's because prelaoding worked.
 
 ## Troubleshooting
 

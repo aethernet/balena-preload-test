@@ -6,8 +6,9 @@ const apps = await fs.readJson(path.join(inPath, "apps.json"))
 
 /** Extract images name/tag from apps.json */
 const appId = Object.keys(apps.apps)[0]
-const images = Object.keys(apps.apps[appId].services)
-  .map(key => apps.apps[appId].services[key].image)
+const releaseId = Object.keys(apps.apps[appId].releases)[0]
+const images = Object.keys(apps.apps[appId].releases[releaseId].services)
+  .map(key => apps.apps[appId].releases[releaseId].services[key].image)
 
 /** Get image id for image tag using `repositories.json` */
 const repositories = await fs.readJson(path.join(inPath, 'var', 'lib', 'docker', 'image', 'overlay2', 'repositories.json'))
