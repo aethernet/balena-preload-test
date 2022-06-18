@@ -96,19 +96,19 @@ for (const repo in repositories.Repositories) {
 // copy overlay2
 for (let overlay of overlays2) {
   // TODO: some layers might be shared across images we should avoid double copy
-  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("overlay2", overlay)}`
+  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("docker", "overlay2", overlay)}`
 }
 
 // copy layers in image/layerdb
 for (let layer of layers) {
   // TODO: some layers might be shared across images we should avoid double copy
-  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join(imagePortion, "layerdb", "sha256", layer)}`
+  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("docker", imagePortion, "layerdb", "sha256", layer)}`
 }
 
 // copy links in overlay2/l
 for (let link of ls) {
   // TODO: some layers might be shared across images we should avoid double copy
-  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("overlay2", "l", link)}`
+  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("docker", "overlay2", "l", link)}`
 }
 
 // write repositories extract for merging
@@ -116,10 +116,10 @@ $`echo ${JSON.stringify(repositoriesExtract)} > ${path.join(outPath, `${imageId}
 await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} ${path.join(`${imageId}.repositories.json`)}`
 
 /** copy imagedb/content/_sha256_ json */
-await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join(imagePortion, "imagedb", "content", "sha256", imageId)}`
+await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("docker", imagePortion, "imagedb", "content", "sha256", imageId)}`
 
 /** copy imagedb/metadata/_sha256_ dir */
-await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join(imagePortion, "imagedb", "metadata", "sha256", imageId)}`
+await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${basePath} ${path.join("docker", imagePortion, "imagedb", "metadata", "sha256", imageId)}`
 
 /** copy apps.json */
 await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${inPath} ${path.join("apps.json")}`
