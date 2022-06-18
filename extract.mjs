@@ -138,4 +138,4 @@ await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(imagePath, "imaged
 
 /** copy apps.json */
 // await $`cp ${path.join(inPath, "apps.json")} ${path.join(outPath, "apps.json")}`
-await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(inPath, "apps.json")}
+await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(inPath, "apps.json")}`
