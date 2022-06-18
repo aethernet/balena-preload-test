@@ -7,3 +7,4 @@ out/*
 !.gitkeep
 out_injectable
 *.tgz
+*.zip

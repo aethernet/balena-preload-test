@@ -92,41 +92,50 @@ for (const repo in repositories.Repositories) {
 
 /** copy everything we identified to `out` folder */
 
-// create folder structure
-await $`mkdir -p ${path.join(outPath, "docker", "overlay2", "l")}`
-await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "imagedb", "content", "sha256")}`
-await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "imagedb", "metadata", "sha256")}`
-await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "layerdb", "sha256")}`
+// // create folder structure
+// await $`mkdir -p ${path.join(outPath, "docker", "overlay2", "l")}`
+// await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "imagedb", "content", "sha256")}`
+// await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "imagedb", "metadata", "sha256")}`
+// await $`mkdir -p ${path.join(outPath, "docker", "image", "overlay2", "layerdb", "sha256")}`
+
+// await $`tar -uvf ${path.join(outPath, "out.tgz")}`
 
 // copy overlay2
 for (let overlay of overlays2) {
-  // some layers my be shared across images which cause copy issue
-  const exist = fs.existsSync(path.join(outBasePath, "overlay2", overlay))
-  if (!exist) await $`cp -Rf ${path.join(basePath, "overlay2", overlay)} ${path.join(outBasePath, "overlay2", overlay)}`
+  // // some layers my be shared across images which cause copy issue
+  // const exist = fs.existsSync(path.join(outBasePath, "overlay2", overlay))
+  // if (!exist) await $`cp -Rf ${path.join(basePath, "overlay2", overlay)} ${path.join(outBasePath, "overlay2", overlay)}`
+  await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(basePath, "overlay2", overlay)}`
 }
 
 // copy layers in image/layerdb
 for (let layer of layers) {
-  // shouldn't be as much a problem as for overlay, but for good measure
-  const exist = fs.existsSync(path.join(outImagePath, "layerdb", "sha256", layer))
-  if (!exist) await $`cp -Rf ${path.join(imagePath, "layerdb", "sha256", layer)} ${path.join(outImagePath, "layerdb", "sha256", layer)}`
+  // // shouldn't be as much a problem as for overlay, but for good measure
+  // const exist = fs.existsSync(path.join(outImagePath, "layerdb", "sha256", layer))
+  // if (!exist) await $`cp -Rf ${path.join(imagePath, "layerdb", "sha256", layer)} ${path.join(outImagePath, "layerdb", "sha256", layer)}`
+  await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(imagePath, "layerdb", "sha256", layer)}`
 }
 
 // copy links in overlay2/l
 for (let link of ls) {
-  // same as overlay
-  const exist = fs.existsSync(path.join(outBasePath, "overlay2", "l", link))
-  if (!exist) await $`cp -Rfn ${path.join(basePath, "overlay2", "l", link)} ${path.join(outBasePath, "overlay2", "l", link)}`
+  // // same as overlay
+  // const exist = fs.existsSync(path.join(outBasePath, "overlay2", "l", link))
+  // if (!exist) await $`cp -Rfn ${path.join(basePath, "overlay2", "l", link)} ${path.join(outBasePath, "overlay2", "l", link)}`
+  await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(basePath, "overlay2", "l", link)}`
 }
 
 // write repositories extract for merging
 $`echo ${JSON.stringify(repositoriesExtract)} > ${path.join(outPath, `${imageId}.repositories.json`)}`
+await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(outPath, `${imageId}.repositories.json`)}`
 
 /** copy imagedb/content/_sha256_ json */
-await $`cp ${path.join(imagePath, "imagedb", "content", "sha256", imageId)} ${path.join(outImagePath, "imagedb", "content", "sha256", imageId)}`
+// await $`cp ${path.join(imagePath, "imagedb", "content", "sha256", imageId)} ${path.join(outImagePath, "imagedb", "content", "sha256", imageId)}`
+await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(imagePath, "imagedb", "content", "sha256", imageId)}`
 
 /** copy imagedb/metadata/_sha256_ dir */
-await $`cp -Rf ${path.join(imagePath, "imagedb", "metadata", "sha256", imageId)} ${path.join(outImagePath, "imagedb", "metadata", "sha256")}`
+// await $`cp -Rf ${path.join(imagePath, "imagedb", "metadata", "sha256", imageId)} ${path.join(outImagePath, "imagedb", "metadata", "sha256")}`
+await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(imagePath, "imagedb", "metadata", "sha256", imageId)}`
 
 /** copy apps.json */
-await $`cp ${path.join(inPath, "apps.json")} ${path.join(outPath, "apps.json")}`
+// await $`cp ${path.join(inPath, "apps.json")} ${path.join(outPath, "apps.json")}`
+await $`tar -uvf ${path.join(outPath, "out.tgz")} ${path.join(inPath, "apps.json")}
