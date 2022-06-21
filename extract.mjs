@@ -96,7 +96,7 @@ for (const repo in repositories.Repositories) {
 
 // copy overlay2
 for (let overlay of overlays2) {
-  // TODO: some layers might be shared across images we should avoid double copy
+  // TODO: some layers might be shared across images we should avoid double copy (tar wouldn't care but the archive would be bigger than needed)
   await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${shortBasePath} ${path.join("docker", "overlay2", overlay)}`
 }
 
@@ -114,7 +114,7 @@ for (let link of ls) {
 
 // write repositories extract for merging
 $`echo ${JSON.stringify(repositoriesExtract)} > ${path.join(outPath, `${imageId}.repositories.json`)}`
-await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} ${path.join(`${imageId}.repositories.json`)}`
+// await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} ${path.join(`${imageId}.repositories.json`)}`
 
 /** copy imagedb/content/_sha256_ json */
 await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${shortBasePath} ${path.join("docker", imagePortion, "imagedb", "content", "sha256", imageId)}`
