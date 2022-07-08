@@ -11,15 +11,20 @@ const images = Object.keys(apps.apps[appId].releases[releaseId].services).map((k
 
 // clean out folder
 await $`rm -rf ${outPath}`
+await $`rm -rf ${path.join(inPath, 'images')}`
 await $`mkdir ${outPath}`
+await $`mkdir -p ${path.join(inPath, 'images')}`
 await $`touch ${path.join(outPath, ".gitkeep")}`
 
 /** Use scopio to pull images from the registry */
-for (const image of images) {
-  const imageUrl = image.split("@")[0]
-  const commitHash = image.split("@")[1]
-  $`./static.mjs --imageUrl ${imageUrl} --commitHash ${commitHash}`
-}
+await Promise.all(
+  images.map(async image => {
+    const imageUrl = image.split("@")[0]
+    const commitHash = image.split("@")[1]
+    await $`./static.mjs --imageUrl ${imageUrl} --commitHash ${commitHash}`
+  })
+)
 
-/** copy apps.json */
-$`cp ${path.join(inPath, "apps.json")} ${path.join(outPath, "apps.json")}`
+// tarball everything for injection
+await $`tar -cvf ${path.join(outPath, "out.tar")} -C ${inPath} apps.json`
+await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} docker`

@@ -12,12 +12,14 @@ const token = argv.token ?? (await $`cat < ./api_key`)
 // utilities
 const generateLinkId = () => [...Array(26).keys()].map(() => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random() * 34)]).join("")
 
-const baseOutPath = path.join(__dirname, "out")
+const baseOutPath = path.join(__dirname, "out", "docker")
 const baseInPath = path.join(__dirname, "in", "images", imageUrl.split("/").reverse()[0])
+
+await $`mkdir ${baseInPath}`
 
 // get the image using skopeo
 if (!argv.skipDownload)
-  await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token} `
+  await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
 
 // get the image hash from manifest
 const manifestJson = await fs.readJson(path.join(baseInPath, "manifest.json"))
@@ -94,7 +96,9 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 // ./size => size of layer in byte
 // ./tar-split.json.gz => ? not sure this one is mandatory; as it's purpose seems related to push/pull functionalities let's try without
 
-// overlay2/*gzipid*
+// overlay2/*gzipid* 
+// <- FIXME: overlay2 folders should be named with something more appropriate, but I cannot find informations about how they're named
+// <- my best guess is a digest of the `diff` folder but i don't know how.
 // ./commited => empty file, not sure what its role is
 // ./link => linkid (random 24 caps alphanum char) / related to the l symlinks
 // ./lower => chain of lower layers links path such as : `l/*LOWER1LINK*:l/*LOWER2LINK*:l/...`, if it's the first in the chain it has all lowers, if it's last it has none
