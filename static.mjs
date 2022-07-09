@@ -11,6 +11,7 @@ const token = argv.token ?? (await $`cat < ./api_key`)
 
 // utilities
 const generateLinkId = () => [...Array(26).keys()].map(() => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random() * 34)]).join("")
+const generateCacheId = () => [...Array(32).keys()].map(() => "0123456789abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random() * 34)]).join("")
 
 const baseOutPath = path.join(__dirname, "out", "docker")
 const baseInPath = path.join(__dirname, "in", "images", imageUrl.split("/").reverse()[0])
@@ -55,6 +56,7 @@ const digests = await Promise.all(
     const layerDigestRes = await $`sha256sum ${path.join(baseInPath, `${digest}.tar`)}`
     return {
       gzipid: digest,
+      cacheid: generateCacheId(),
       layerid: layerDigestRes.stdout.split(" ")[0],
       size,
       linkid: generateLinkId(),
@@ -96,7 +98,7 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 // ./size => size of layer in byte
 // ./tar-split.json.gz => ? not sure this one is mandatory; as it's purpose seems related to push/pull functionalities let's try without
 
-// overlay2/*gzipid* 
+// overlay2/*cacheid* 
 // <- FIXME: overlay2 folders should be named with something more appropriate, but I cannot find informations about how they're named
 // <- my best guess is a digest of the `diff` folder but i don't know how.
 // ./commited => empty file, not sure what its role is
@@ -107,21 +109,21 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 // overlay2/l/*linkid* -> symlink pointing to related overlay diff folder; linkid has to be the same as content of link file
 
 for (const key in digests) {
-  const { layerid, chainid, gzipid, size, linkid } = digests[key]
+  const { layerid, chainid, cacheid, size, linkid } = digests[key]
   await $`mkdir -p ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid)}`
-  $`echo ${`sha256:${gzipid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "cache-id")}`
+  $`echo ${`sha256:${cacheid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "cache-id")}`
   $`echo ${`sha256:${layerid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "diff")}`
   $`echo ${size} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "size")}`
   if (key > 0)
     $`echo ${`sha256:${digests[key - 1].chainid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "parent")}`
   
-  await $`mkdir -p ${path.join(baseOutPath, "overlay2", gzipid, "work")}`
-  $`touch ${path.join(baseOutPath, "overlay2", gzipid, "commited")}`
-  $`echo ${linkid} > ${path.join(baseOutPath, "overlay2", gzipid, "link")}`
-  await $`mkdir -p ${path.join(baseOutPath, "overlay2", gzipid, "diff")}`
-  $`tar -zxf ${path.join(baseInPath, `${gzipid}.tar`)} -C ${path.join(baseOutPath, "overlay2", gzipid, "diff")}`
-  $`echo ${linkIdFullChain.slice(key).join(":")} > ${path.join(baseOutPath, "overlay2", gzipid, "lower")}`
-  $`ln -s ${path.join(baseOutPath, "overlay2", gzipid, "diff")} ${path.join(baseOutPath, "overlay2", "l", linkid)}`
+  await $`mkdir -p ${path.join(baseOutPath, "overlay2", cacheid, "work")}`
+  $`touch ${path.join(baseOutPath, "overlay2", cacheid, "commited")}`
+  $`echo ${linkid} > ${path.join(baseOutPath, "overlay2", cacheid, "link")}`
+  await $`mkdir -p ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
+  $`tar -zxf ${path.join(baseInPath, `${cacheid}.tar`)} -C ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
+  $`echo ${linkIdFullChain.slice(key).join(":")} > ${path.join(baseOutPath, "overlay2", cacheid, "lower")}`
+  $`ln -s ${path.join(baseOutPath, "overlay2", cacheid, "diff")} ${path.join(baseOutPath, "overlay2", "l", linkid)}`
 }
 
 // create the repositories.json snippet for the image
