@@ -10,6 +10,7 @@ const user = argv.user ?? "u_edwin3"
 const token = argv.token ?? (await $`cat < ./api_key`)
 
 // utilities
+// FIXME: there's no mechanism to prevent collision
 const generateLinkId = () => [...Array(26).keys()].map(() => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random() * 34)]).join("")
 const generateCacheId = () => [...Array(32).keys()].map(() => "0123456789abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random() * 34)]).join("")
 
@@ -92,7 +93,7 @@ await $`mkdir -p ${path.join(baseOutPath, "image", "overlay2", "imagedb", "metad
 $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2", "imagedb", "metadata", "sha256", imageHash, "lastUpdated")}`
 
 // images/overlay2/layerdb/sha256/*chainId*
-// ./cache-id => id of corresponding overlay2
+// ./cache-id => id of corresponding overlay2 -> 32 random alphanum char
 // ./diff => layerId
 // ./parent => parent chainId
 // ./size => size of layer in byte
@@ -109,7 +110,7 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 // overlay2/l/*linkid* -> symlink pointing to related overlay diff folder; linkid has to be the same as content of link file
 
 for (const key in digests) {
-  const { layerid, chainid, cacheid, size, linkid } = digests[key]
+  const { layerid, chainid, gzipid, cacheid, size, linkid } = digests[key]
   await $`mkdir -p ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid)}`
   $`echo ${`sha256:${cacheid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "cache-id")}`
   $`echo ${`sha256:${layerid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "diff")}`
@@ -121,7 +122,7 @@ for (const key in digests) {
   $`touch ${path.join(baseOutPath, "overlay2", cacheid, "commited")}`
   $`echo ${linkid} > ${path.join(baseOutPath, "overlay2", cacheid, "link")}`
   await $`mkdir -p ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
-  $`tar -zxf ${path.join(baseInPath, `${cacheid}.tar`)} -C ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
+  $`tar -zxf ${path.join(baseInPath, `${gzipid}.tar`)} -C ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
   $`echo ${linkIdFullChain.slice(key).join(":")} > ${path.join(baseOutPath, "overlay2", cacheid, "lower")}`
   $`ln -s ${path.join(baseOutPath, "overlay2", cacheid, "diff")} ${path.join(baseOutPath, "overlay2", "l", linkid)}`
 }
