@@ -90,8 +90,8 @@ await $`mkdir -p ${path.join(baseOutPath, "image", "overlay2", "imagedb", "metad
 $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2", "imagedb", "metadata", "sha256", imageHash, "lastUpdated")}`
 
 // images/overlay2/layerdb/sha256/*chainId*
-// ./cache-id => layerId
-// ./diff => id of corresponding overlay2
+// ./cache-id => id of corresponding overlay2
+// ./diff => layerId
 // ./parent => parent chainId
 // ./size => size of layer in byte
 // ./tar-split.json.gz => ? not sure this one is mandatory; as it's purpose seems related to push/pull functionalities let's try without
@@ -109,11 +109,12 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 for (const key in digests) {
   const { layerid, chainid, gzipid, size, linkid } = digests[key]
   await $`mkdir -p ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid)}`
-  $`echo ${`sha256:${layerid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "cache-id")}`
-  $`echo ${`sha256:${gzipid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "diff")}`
+  $`echo ${`sha256:${gzipid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "cache-id")}`
+  $`echo ${`sha256:${layerid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "diff")}`
   $`echo ${size} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "size")}`
   if (key > 0)
     $`echo ${`sha256:${digests[key - 1].chainid}`} > ${path.join(baseOutPath, "image", "overlay2", "layerdb", "sha256", chainid, "parent")}`
+  
   await $`mkdir -p ${path.join(baseOutPath, "overlay2", gzipid, "work")}`
   $`touch ${path.join(baseOutPath, "overlay2", gzipid, "commited")}`
   $`echo ${linkid} > ${path.join(baseOutPath, "overlay2", gzipid, "link")}`
@@ -130,3 +131,5 @@ const repositories = {
     [`${imageUrl}@${commitHash}`]: `sha256:${imageHash}`, // the commit hash is an information we can grab from apps.json
   },
 }
+
+$`echo ${repositories} > ${path.join(baseOutPath, '..', `${imageHash}.repositories.json`)}`
