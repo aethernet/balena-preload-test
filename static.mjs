@@ -135,4 +135,4 @@ const repositories = {
   },
 }
 
-$`echo ${repositories} > ${path.join(baseOutPath, '..', `${imageHash}.repositories.json`)}`
+$`echo ${JSON.stringify(repositories)} > ${path.join(baseOutPath, '..', `${imageHash}.repositories.json`)}`
