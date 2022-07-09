@@ -35,6 +35,10 @@ You need to remove the first `key` and get the contnet one level up so it looks 
 #### TODO: 
 - automate this whole thing (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the device).
 
+- in layers i skiped the creation `split-tar.json.gz` as it's related to the distribution. I tried injecting them from a known working version of the layers and it didn't fix the loading issue.
+
+- `size` (in layers) is false (always bigger than actual size) but it shouldn't realy be a problem atm
+
 ## Extract
 
 1. run `extractApp.mjs`
