@@ -104,7 +104,7 @@ $`echo ${new Date().toISOString()} > ${path.join(baseOutPath, "image", "overlay2
 // <- my best guess is a digest of the `diff` folder but i don't know how.
 // ./commited => empty file, not sure what its role is
 // ./link => linkid (random 24 caps alphanum char) / related to the l symlinks
-// ./lower => chain of lower layers links path such as : `l/*LOWER1LINK*:l/*LOWER2LINK*:l/...`, if it's the first in the chain it has all lowers, if it's last it has none
+// ./lower => chain of lower layers links path such as : `l/*LOWER1LINK*:l/*LOWER2LINK*:l/...`, if it's the first in the chain it has all lowers, if it's last it has none // TODO: not sure i'm computing this one right
 // ./diff/* => actual content of the layer (gunzip + untar of the layer archive)
 // ./work => empty folder
 // overlay2/l/*linkid* -> symlink pointing to related overlay diff folder; linkid has to be the same as content of link file
