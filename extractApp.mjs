@@ -28,3 +28,4 @@ await Promise.all(
 // tarball everything for injection
 await $`tar -cvf ${path.join(outPath, "out.tar")} -C ${inPath} apps.json`
 await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} docker`
+await $`cd ${outPath} && tar -uvf ${path.join(outPath, "out.tar")} *.repositories.json`

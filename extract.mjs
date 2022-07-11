@@ -34,7 +34,7 @@ const inspect = await fs.readJson(path.join(imagePath, "imagedb", "content", "sh
  *
  * Notes about how they're built :
  * Layers in the json are labbeled using diffId (sha256 based on the content of the uncompressed diff folder)
- * Layers in the folder are named using pathId which is a sha256 of a string composed of the diffId of the layer, a space, and the pathId of the parent layer
+ * Layers in the folder are named using pathId which is a sha256 of a string composed of the chainId of the parent layer, a space, and the diffId of the current layer
  * As the highest layer has no parent diffid == pathid.
  *
  * We'll compute each chainId and double check using the `parent` file contained into the folder (it should contains the `chainId` of the parent layer)
