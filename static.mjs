@@ -6,9 +6,14 @@ import path from "path"
 const imageUrl = argv.imageUrl ?? "registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5"
 const commitHash = argv.commitHash ?? "sha256:0ae9a712a8c32ac04b91d659a9bc6d4bb2e76453aaf3cfaf036f279262f1f100"
 
-const user = argv.user ?? "u_edwin3"
-const token = argv.token ?? (await $`cat < ./api_key`)
+// const user = argv.user ?? "u_zoobot"
+// const token = argv.token ?? await $`cat < ~/.balena/token`
 
+const user = await $`(balena whoami | grep USERNAME | cut -c11-)` ?? "u_zoobot"
+const apiKey = await $`(balena api-key generate "${user}")`
+console.log('\n\n\n apiKey', apiKey )
+const token = await apiKey.stdout.split("\n\n")[1];
+console.log('token', token)
 // utilities
 const generateLinkId = () => [...Array(26).keys()].map(() => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random() * 34)]).join("")
 
@@ -52,7 +57,10 @@ const digests = await Promise.all(
       await $`mv ${path.join(baseInPath, digest)} ${path.join(baseInPath, `${digest}.tar.gz`)}`
       await $`gunzip ${path.join(baseInPath, `${digest}.tar.gz`)}`
     }
-    const layerDigestRes = await $`sha256sum ${path.join(baseInPath, `${digest}.tar`)}`
+    const osType = await $`uname -a`
+    const layerDigestRes = osType.stdout.includes('Linux')
+      ? await $`sha256sum ${path.join(baseInPath, `${digest}.tar`)}`
+      : await $`openssl sha256 ${path.join(baseInPath, `${digest}.tar`)}`
     return {
       gzipid: digest,
       layerid: layerDigestRes.stdout.split(" ")[0],
