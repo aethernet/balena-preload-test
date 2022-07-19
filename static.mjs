@@ -139,7 +139,7 @@ for (const key in digests) {
   await $`echo ${linkid} > ${path.join(baseOutPath, "overlay2", cacheid, "link")}`
   await $`chmod 644 ${path.join(baseOutPath, "overlay2", cacheid, "link")}`
   await $`mkdir -p ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
-  await $`tar -zxf ${path.join(baseInPath, `${gzipid}.tar`)} -C ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
+  await $`tar -xf ${path.join(baseInPath, `${gzipid}.tar`)} -C ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
   await $`chmod 755 ${path.join(baseOutPath, "overlay2", cacheid, "diff")}`
   if(key > 0) {
     await $`echo ${linkIdFullChain.slice(0, key).join(":")} > ${path.join(baseOutPath, "overlay2", cacheid, "lower")}`
