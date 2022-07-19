@@ -9,19 +9,16 @@
 # balena_api_token="$(cat < ~/.balena/token)"
 # echo $balena_api_token
 
-# uuid=$(printf "results:\n$(sudo balena scan)" \
-#   | yq e '.results[] | select(.osVariant=="development").host' - \
-#   | awk -F'.' '{print $1}' | head -n 1); echo $uuid;
-
-# username="zoobot"
-# machine_name="nuc"
-# balena_device_uuid="$(balena devices|grep ${username}|grep ${machine_name}|grep true|awk '{print $NF}'| awk -F'[[:space:]="/]+' '{print $(NF-1)}')"; echo $balena_device_uuid;
 # -------------------------------------------------------
 # SET Nuc ids
 # -------------------------------------------------------
 
-uuid='7710555'
-balena_device_uuid='77105551e3a8a66011f16b1fe82bc504'
+uuid=$(printf "results:\n$(sudo balena scan)" \
+  | yq e '.results[] | select(.osVariant=="development").host' - \
+  | awk -F'.' '{print $1}' | head -n 1); echo $uuid;
+
+balena_device_uuid="$(balena devices|grep ${username}|grep ${machine_name}|grep true|awk '{print $NF}'| awk -F'[[:space:]="/]+' '{print $(NF-1)}')"; echo $balena_device_uuid;
+
 tld='bob.local'
 
 echo $uuid

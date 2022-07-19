@@ -1,7 +1,7 @@
 #!/usr/bin/env zx
 
 const inPath = path.join(__dirname, "in")
-const outPath = path.join(__dirname, "out")
+const outPath = '/tmp/out';
 const apps = await fs.readJson(path.join(inPath, "apps.json"))
 
 /** Extract images name/tag from apps.json */
@@ -19,9 +19,15 @@ await $`touch ${path.join(outPath, ".gitkeep")}`
 /** Use scopio to pull images from the registry */
 await Promise.all(
   images.map(async image => {
+
+    console.log('\n\nimage', image);
     const imageUrl = image.split("@")[0]
+    console.log('\n\nimageUrl', imageUrl)
     const commitHash = image.split("@")[1]
-    await $`./static.mjs --imageUrl ${imageUrl} --commitHash ${commitHash}`
+
+    //question is the commitHash the release is pointing to?
+    console.log('commitHash', commitHash, '\n\nimage', image)
+    await $`./staticV2.mjs --imageUrl ${imageUrl} --commitHash ${commitHash}`
   })
 )
 
