@@ -19,6 +19,8 @@ await $`rm -rf ${outPath}`
 await $`mkdir -p ${outPath}`
 await $`touch ${path.join(outPath, ".gitkeep")}`
 
+await $`tar -cvf ${path.join(outPath, "out.tar")} -C ${inPath} apps.json`
+
 /** Run extract for each image in the app */
 for (let image of imagesId) {
   await $`./extract.mjs --image ${image}`
