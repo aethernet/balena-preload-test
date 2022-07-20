@@ -1,28 +1,46 @@
 #!/usr/bin/env zx
 
-// const scanned = await $`sudo balena scan |grep address`;
-// console.log('scanned', scanned);
-
-// bob Nuc
-const bobAddress = '192.168.4.185';
-// const bobAddress = await $`(printf "results:\n$(sudo balena scan)" \
-//     | yq e '.results[] \
-//     | select(.osVariant=="development").address' - \
-//     | head -n 1)`;
-const uuid='7710555';
-const balenaDeviceUuid='77105551e3a8a66011f16b1fe82bc504';
-const tld='bob.local';
+// const scanned = await $`sudo balena scan`;
+// console.log('scanned.stdout', scanned.stdout);
+const addresses = await $`(printf "results:\n$(sudo balena scan)" \
+    | yq e '.results[] \
+    | select(.osVariant=="development").address')`;
 
 // test device (raspberry pi 4)
-const deviceAddress = '192.168.4.82';
-// const deviceAddress = await $`(printf "results:\n$(sudo balena scan)" \
-//     | yq e '.results[] \
-//     | select(.osVariant=="development").address' - \
-//     | tail -n 1)`;
-const versionAppJson = '4';
+const deviceAddress = addresses.stdout.split("\n")[1] ?? '192.168.4.222';
+console.log('device Address', deviceAddress);
 
-const inPath = path.join(__dirname, "in");
-const outPath = path.join(__dirname, "out");
+// bob device
+const bobAddress = addresses.stdout.split("\n")[0] ?? '192.168.4.185';
+console.log(' bobAddress',  bobAddress);
+
+const uuid = await $`(printf "results:\n$(sudo balena scan)" \
+  | yq e '.results[] | select(.osVariant=="development").host' - \
+  | awk -F'.' '{print $1}' | tail -n 1)` ?? '7710555';
+console.log('uuid', uuid);
+
+
+const username = await $`(balena whoami | grep USERNAME | cut -c11-)` ?? bob;
+let api_key = await $`(cat < ~/.balena/token)`;
+
+//https://dashboard.77105551e3a8a66011f16b1fe82bc504.bob.local/devices/a6facb7b455dd99e9eb8ba3930c0b85b/summar
+// You are getting this: 77105551e3a8a66011f16b1fe82bc504
+const balenaDeviceUuid = await $`(balena devices|grep bob|grep 7710555|grep true|awk '{print $NF}'| awk -F'/' '{print $3}'|awk -F'.' '{print $2}')` ?? '77105551e3a8a66011f16b1fe82bc504';
+console.log('balenaDeviceUuid', balenaDeviceUuid);
+const tld = 'bob.local';
+
+
+const versionAppJson = '4';
+const inPath = '/tmp/in'
+if (!fs.existsSync(inPath)){
+    fs.mkdirPathSync(inPath);
+}
+
+
+const outPath = '/tmp/out';
+if (!fs.existsSync(outPath)){
+    fs.mkdirPathSync(outPath);
+}
 
 const configPath = `${inPath}/config${versionAppJson}.json`;
 const appsPathVersioned = `${inPath}/apps${versionAppJson}.json`;
@@ -50,7 +68,7 @@ const appsJsonFull = await $`curl -H "Content-Type: application/json" \
 const apps = await fs.readJson(appsPathVersioned);
 const appsJson = await apps[deviceId];
 await fs.writeFileSync(appsPath, JSON.stringify(appsJson));
-console.log('appsJson', appsJson);
+// console.log('appsJson', appsJson);
 await $`ls ${inPath}/`;
 await $`cat ${appsPath} | jq`;
 

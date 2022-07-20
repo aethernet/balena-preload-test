@@ -149,3 +149,8 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 Some `overlay2` might be shared across multiple images (if they are identical).
 This is not a problem per se, but as they're full of symlinks it might become an issue at injection stage.
+
+
+## Useful Documentation and Links
+
+[https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html](https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html)
