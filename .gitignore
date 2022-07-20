@@ -9,3 +9,4 @@ out_injectable
 *.tgz
 *.zip
 success/*
+diff/*
