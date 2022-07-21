@@ -149,3 +149,36 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 Some `overlay2` might be shared across multiple images (if they are identical).
 This is not a problem per se, but as they're full of symlinks it might become an issue at injection stage.
+
+
+## Useful Documentation and Links
+
+[https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html](https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html)
+
+
+
+## WHAT WORKS
+
+
+## WHAT'S BROKEN
+
+1. Files are not correct for image to run
+2. Doesn't find layer - moby check what to do when doesnt find the layer - during injection - in memory db or object - when happens create the database of layers
+
+
+Extraction overlay2/imagedb/metadata/lastUpdated - line- break
+ date has more milliseconds ISO Is there IS with more milliseconds?
+overlay2/imagedb/content is exactly the same 
+
+layerdb/sha256
+
+cache-id - line break
+diff - line break
+size - line break
+parent - line break
+1 byte difference 
+permission also wrong? file type difference
+
+Is encoding wrong
+
+use fs
