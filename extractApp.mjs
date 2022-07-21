@@ -26,15 +26,11 @@ const releaseId = Object.keys(apps.apps[appId].releases)[0]
 const images = Object.keys(apps.apps[appId].releases[releaseId].services).map((key) => apps.apps[appId].releases[releaseId].services[key].image)
 
 /** Use scopio to pull images from the registry */
-await Promise.all(
-  images.map(async image => {
-    const imageUrl = image.split("@")[0]
-    const commitHash = image.split("@")[1]
-
-    //question is the commitHash the release is pointing to?
-    await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
-  })
-)
+for (const image in images) {
+  const imageUrl = image.split("@")[0]
+  const commitHash = image.split("@")[1]
+  await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
+}
 
 // tarball everything for injection
 if (!argv.skipTar) {
