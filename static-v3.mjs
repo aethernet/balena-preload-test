@@ -138,25 +138,22 @@ const digests = await Promise.all(
   return newDigests
 })
 
-console.log(digests)
-
 // prebuild a chain of linkid path to use in overlays2's `lower` files
 const linkIdFullChain = digests.map((digest) => `l/${digest.linkid}`)
 
-console.log(`=> ${imageUrl} : create directories`)
 const imageDirectories = [
     {pathStr: `${baseOutPath}/image/overlay2/imagedb/content/sha256`, mode: '0777'},
     {pathStr: `${baseOutPath}/image/overlay2/imagedb/metadata/sha256`, mode: '0777'},
-    {pathStr: `${baseOutPath}/image/overlay2/imagedb/sha256`, mode: '0777'},
     {pathStr: `${baseOutPath}/overlay2/l`, mode: '0777'},
     {pathStr: `${baseOutPath}/image/overlay2/imagedb/metadata/sha256/${imageHash}`, mode: '0777'},
 ]
 makeDirectories(imageDirectories)
-console.log(`=> ${imageUrl} : add image`)
 const imageFiles = [
-  {name: `${baseOutPath}/image/overlay2/imagedb/metadata/sha256/${imageHash}/lastUpdated`, 
+  {
+    name: `${baseOutPath}/image/overlay2/imagedb/metadata/sha256/${imageHash}/lastUpdated`, 
     val: new Date().toISOString(), 
-    mode: '0644'}
+    mode: '0644'
+  }
 ]
 makeFiles(imageFiles)
 
@@ -173,7 +170,7 @@ await $`cp ${path.join(baseInPath, imageHash)} ${path.join(baseOutPath, "image",
 // ./diff => layerId
 // ./parent => parent chainId
 // ./size => size of layer in byte
-// ./tar-split.json.gz => ? not sure this one is mandatory as it's purpose seems related to push/pull functionalities let's try without
+// ./tar-split.json.gz => we skip this one as it works without. AFAIK It's should only be useful for `pushing` back the image to a registry, which we shouldn't do from a balena preloaded device.
 
 // overlay2/*cacheid* 
 // <- FIXME: overlay2 folders should be named with something more appropriate, but I cannot find informations about how they're named
@@ -192,7 +189,6 @@ const writeToFile = (filePath, content, mode) => fs.writeFileSync(filePath, cont
 // https://github.com/moby/moby/blob/master/vendor/github.com/containerd/containerd/rootfs/diff.go
 // https://github.com/containerd/containerd/blob/main/diff/diff.go
 
-console.log(`=> ${imageUrl} : add layers`)
 for (const key in digests) {
   const { layerid, chainid, gzipid, cacheid, size, linkid } = digests[key]
   

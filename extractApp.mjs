@@ -6,7 +6,7 @@ const outPath = path.join(__dirname, 'out')
 
 // clean out folder
 await $`rm -rf ${outPath}`
-await $`rm -rf ${path.join(inPath, 'images')}`
+if (!argv.skipDownload) await $`rm -rf ${path.join(inPath, 'images')}`
 
 // create work directories
 const workDirectories = [
@@ -32,11 +32,13 @@ await Promise.all(
     const commitHash = image.split("@")[1]
 
     //question is the commitHash the release is pointing to?
-    await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash}`
-  })
-)
+    await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
+  }
+// )
 
 // tarball everything for injection
-await $`tar -cvf ${path.join(outPath, "out.tar")} -C ${inPath} apps.json`
-await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} docker`
-await $`cd ${outPath} && tar -uvf ${path.join(outPath, "out.tar")} *.repositories.json`
+if (!argv.skipTar) {
+  await $`tar -cvf ${path.join(outPath, "out.tar")} -C ${inPath} apps.json`
+  await $`tar -uvf ${path.join(outPath, "out.tar")} -C ${outPath} docker`
+  await $`cd ${outPath} && tar -uvf ${path.join(outPath, "out.tar")} *.repositories.json`
+}
