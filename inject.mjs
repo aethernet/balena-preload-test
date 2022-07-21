@@ -15,7 +15,7 @@ if (!argv.skipLayers) {
 }
 
 // copy static_network config
-if (mountBoot) {
+if (mountBoot && fs.existsSync(path.join(mountBoot))) {
   const staticIpExist = fs.existsSync(path.join(__dirname, "static_ip"))
   const configExist = fs.existsSync(path.join(__dirname, "in", "config.json"))
   if(staticIpExist) await $`cp ${path.join(__dirname, "static_ip")} ${path.join(mountBoot, "system-connections", "static_ip")}`

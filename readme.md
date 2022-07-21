@@ -166,9 +166,9 @@ This is not a problem per se, but as they're full of symlinks it might become an
 2. Doesn't find layer - moby check what to do when doesnt find the layer - during injection - in memory db or object - when happens create the database of layers
 
 
-Extraction overlay2/imagedb/metadata/lastUpdated - line- break
- date has more milliseconds ISO Is there IS with more milliseconds?
-overlay2/imagedb/content is exactly the same 
+- Extraction image/overlay2/imagedb/metadata/lastUpdated - line-break
+- date has more milliseconds ISO Is there IS with more milliseconds?
+- image/overlay2/imagedb/content is exactly the same 
 
 layerdb/sha256
 

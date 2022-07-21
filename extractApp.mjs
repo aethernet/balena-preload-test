@@ -1,10 +1,8 @@
 #!/usr/bin/env zx
-import { makeDirectories, makeFiles } from './utilities.mjs';
+import { makeDirectories, makeFiles } from './utilities.mjs'
 
-
-
-const inPath = '/tmp/in'
-const outPath = '/tmp/out';
+const inPath = path.join(__dirname, 'in')
+const outPath = path.join(__dirname, 'out')
 
 // clean out folder
 await $`rm -rf ${outPath}`
@@ -16,7 +14,7 @@ const workDirectories = [
     {pathStr: outPath, mode: '0777'},
     {pathStr: `${inPath}/images`, mode: '0777'},
 ]
-makeDirectories(workDirectories);
+makeDirectories(workDirectories)
 
 await $`touch ${path.join(outPath, ".gitkeep")}`
 
