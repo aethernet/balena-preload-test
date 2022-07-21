@@ -26,6 +26,7 @@ const releaseId = Object.keys(apps.apps[appId].releases)[0]
 const images = Object.keys(apps.apps[appId].releases[releaseId].services).map((key) => apps.apps[appId].releases[releaseId].services[key].image)
 
 /** Use scopio to pull images from the registry */
+// We should process image in sequence instead of parallel to avoid clash with shared layers (or have a smarter optimization mechanism)
 for (const image in images) {
   const imageUrl = image.split("@")[0]
   const commitHash = image.split("@")[1]
