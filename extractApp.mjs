@@ -33,8 +33,8 @@ await Promise.all(
 
     //question is the commitHash the release is pointing to?
     await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
-  }
-// )
+  })
+)
 
 // tarball everything for injection
 if (!argv.skipTar) {

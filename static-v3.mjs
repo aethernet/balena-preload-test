@@ -182,6 +182,13 @@ await $`cp ${path.join(baseInPath, imageHash)} ${path.join(baseOutPath, "image",
 
 // ./lower => chain of lower layers links path such as : `l/*LOWER1LINK*:l/*LOWER2LINK*:l/...`, if it's the first in the chain it has all lowers, if it's last it has no lower file
 
+// A note on deduplication
+// As some layers might be shared across multiple images, their chainid up to a point might be the same.
+// In that case we shouldn't duplicate the `cache` folder (overlay2) and shouldn't override the `cache-id` of the layer
+// But this poses the problem of the `lower` directory for layers which _exists_ before the duplicated one
+// The lower chain shouldn't point to "random" links but to the shared ones
+// FIXME: the lower chain is broken atm
+
 // overlay2/l/*linkid* -> symlink pointing to related overlay diff folder linkid has to be the same as content of link file
 const writeToFile = (filePath, content, mode) => fs.writeFileSync(filePath, content, { mode })
 //44
@@ -195,6 +202,10 @@ for (const key in digests) {
   // ============================================================
   //chainId
   const baseOutPathChainId = `${baseOutPath}/image/overlay2/layerdb/sha256/${chainid}`
+  
+  // if the layer has already been made for another image, just skip it (it will be shared)
+  if (fs.existsSync(baseOutPathChainId)) continue
+
   const digestChainIdDirectories = [
     {pathStr: baseOutPathChainId, mode: '0777'},
   ]
