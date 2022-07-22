@@ -51,19 +51,7 @@ const workDirectories = [
     {pathStr: inPath, mode: 766},
     {pathStr: outPath, mode: 766},
 ]
-makeDirectories(workDirectoriess);
-
-
-
-// if (!fs.existsSync(inPath)){
-//     fs.mkdirPathSync(inPath);
-// }
-
-
-// 
-// if (!fs.existsSync(outPath)){
-//     fs.mkdirPathSync(outPath);
-// }
+makeDirectories(workDirectories);
 
 const configPath = `${inPath}/config${versionAppJson}.json`;
 const appsPathVersioned = `${inPath}/apps${versionAppJson}.json`;
