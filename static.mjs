@@ -3,19 +3,19 @@
 
 import crypto from 'crypto'
 import path from 'path'
+import {inspect} from 'util'
 import { makeDirectories, makeFiles } from './utilities.mjs'
+import { pullManifestFromRegistry } from './getManifest.mjs'
 
 $.verbose = false
 
 const imageUrl = argv.imageUrl ?? "registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5"
 const commitHash = argv.commitHash ?? "sha256:0ae9a712a8c32ac04b91d659a9bc6d4bb2e76453aaf3cfaf036f279262f1f100"
 
-console.log(`=====> getting ${imageUrl}`)
-
+const user = argv.user ?? "bob"
+const token = argv.token ?? (await $`cat < ~/.balena/token`)
 // const user = argv.user ?? "u_edwin3"
 // const token = argv.token ?? (await $`cat < ./api_key`)
-const user = argv.user ?? "u_edwin3"
-const token = argv.token ?? (await $`cat < ./api_key`)
 
 // utilities
 const generateLinkId = () => crypto.randomBytes(13).toString('hex').toUpperCase()
@@ -32,29 +32,55 @@ makeDirectories(baseDirectories)
 
 // get the image using skopeo
 if (!argv.skipDownload)
+  console.log(`=====> getting ${imageUrl}`)
   // await $`skopeo inspect ${`docker://${imageUrl}`} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
-  await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
-
+  // await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
 console.log(`=> got ${imageUrl} archive; processing`)
+  
+const manifest = await pullManifestFromRegistry(imageUrl, {user, token})
+await fs.writeFileSync(`${path.join(baseInPath)}/manifest.json`, JSON.stringify(manifest, null, 2));
+
+const manifestJson = await fs.readJson(path.join(baseInPath, "manifest.json"))
 
 // get the image hash from manifest
 // https://docs.docker.com/engine/reference/commandline/manifest/
 // The manifest.json file describes the location of a list of image layers and config file. 
 // It can then be used in the same way as an image name in docker pull and docker run commands.
-const manifestJson = await fs.readJson(path.join(baseInPath, "manifest.json"))
-const imageHash = manifestJson.config.digest.split(":")[1]
 
+console.log(`==> got ${inspect(manifestJson, true,10,true)} manifest json`)
+const imageHash = await manifestJson.config.digest.split(":")[1]
+console.log(`==>  ${imageHash} <-imageHash baseInPath`,baseInPath)
+// const layerUrl = `${imageUrl}/${imageHash}`
+// const imageHashManifest = await pullManifestFromRegistry(layerUrl, {user, token})
+// await fs.writeFileSync(`${path.join(baseInPath)}/imageHash`, JSON.stringify(imageHashManifest, null, 2));
+// await $`mkdir -p ${path.join(baseInPath, imageHash)}`
+// await $`chmod -R 777 ${baseInPath}\${imageHash}`
 // get the image json
 // Each layer is comprised of a json file (which looks like the config file), 
 // a VERSION file with the string 1.0 , and a layer.tar file containing the images files.
 // https://blog.knoldus.com/docker-manifest-a-peek-into-images-manifest-json-files/
-const imageJson = await fs.readJson(path.join(baseInPath, imageHash))
 
 // list manifest digest from manifest layers
-const tgzLayersDigest = manifestJson.layers.map((layer) => ({
-  digest: layer.digest.split(":")[1],
-  size: layer.size,
+const tgzLayersDigest = await Promise.all(manifestJson.layers.map(async (layer) => {
+  const layerInfo = {
+    digest: layer.digest.split(":")[1],
+    size: layer.size,
+  }
+  // TODO Get blobs
+  // GET /v2/<name>/blobs/<digest></digest>
+  // const layerUrl = `${imageUrl}/blobs/${layerInfo.digest}`
+  // const manifest = await pullManifestFromRegistry(layerUrl, {user, token})
+  // await fs.writeFileSync(`${path.join(baseInPath)}/layerInfo.digest`, JSON.stringify(manifest, null, 2));
+
+  return layerInfo
 }))
+
+console.log(`==>  ${inspect(tgzLayersDigest, true,10,true)}<-tgzLayersDigest`)
+
+console.log(`==>  ${path.join(baseInPath)} path.join(baseInPath)`)
+const imageJson = await fs.readJson(path.join(baseInPath, imageHash))
+console.log(`==>  ${imageJson} imageJson`)
+
 
 // rename all files to have .tar.gz
 // gunzip to get the tar

@@ -13,6 +13,7 @@ const workDirectories = [
     {pathStr: inPath, mode: '0777'},
     {pathStr: outPath, mode: '0777'},
     {pathStr: `${inPath}/images`, mode: '0777'},
+    {pathStr: `${outPath}/docker`, mode: '0777'},
 ]
 makeDirectories(workDirectories)
 
@@ -25,6 +26,7 @@ const appId = Object.keys(apps.apps)[0]
 const releaseId = Object.keys(apps.apps[appId].releases)[0]
 const services = Object.keys(apps.apps[appId].releases[releaseId].services)
 console.log('services =>', services)
+const images = services.map((key) => apps.apps[appId].releases[releaseId].services[key].image)
 
 /** 
   Pull images from the registry and process them 
