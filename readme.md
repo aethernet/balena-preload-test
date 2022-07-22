@@ -1,13 +1,16 @@
 # Extract images from fs of a running balena-engine / docker and inject in a clean balenaos
 
+## Warning
+
+I believe this POC is close to working but ... it's not working.
+
 ## Prepare
 
-1. Connect a device to a fleet or build some images
-2. SSH to the host
-3. Compress the whole `/var/lib/docker` (ie : `tar -zcvf /tmp/docker.tgz /var/lib/docker` )
-4. Exfiltrate archived `var/lib/docker` (ie : `curl -T /tmp/docker.tgz https://transfer.sh/docker.tgz`)
-5. Uncompress `var/lib/docker` in the `in` folder (from this repo) on your dev machine (i.e. `tar -zxvf /tmp/docker.tgz` )
-6. Put a valid `apps.json` v3 for the fleet to preload in the `in` folder (cf `get apps.json` section below)
+1. Put a valid `apps.json` v3 for the fleet to preload in the `in` folder (cf `get apps.json` section below)
+2. Change your username at the top of `static.mjs`
+3. Create a api token for your user on balena dashboard and write it in a `api_key` at the root of this project
+4. Install `skopeo` (on mac : `brew install skopeo`)
+5. Install `sha256sum` (on mac : `brew install coreutils`)
 
 ### Get `apps.json`
 
@@ -32,15 +35,22 @@ You need to remove the first `key` and get the contnet one level up so it looks 
 #### TODO: 
 - automate this whole thing (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the device).
 
+- in layers i skiped the creation `split-tar.json.gz` as it's related to the distribution. I tried injecting them from a known working version of the layers and it didn't fix the loading issue.
+
+- `size` (in layers) is false (always bigger than actual size) but it shouldn't realy be a problem atm
+
 ## Extract
 
 1. run `extractApp.mjs`
 
-- Images `name` will be taken from the `apps.json` and translation to image hash will be done using the `repositories.json` from the assets
-- All `layers` and metadata for all images will be extracted to the `out` folder.
-- A snippet of `repositories.json` will be copied for each images as `_imageHash_.repositories.json` in the out folder
+- Images `name` will be taken from the `apps.json`
+- Images assets will be downloaded in the `in/images` folder
+- A docker folder structure will be created in out folder
+- Assets will be processed and place where they should
+- Persmissions will be set on those files (might require sudo)
+- Snippets of `repositories.json` will be created for each images as `_imageHash_.repositories.json` in the out folder
 - `apps.json` will be copied from `in` to `out`
-
+- The whole `out` folder will be put into a `tarball`
 ## Inject to a balenaos `.img`
 
 1. Mount the two partitions (`resin-data` and `resin-boot`) from balenaos inflated, expanded image (cf `resizeBalenaOsPartition.md` for details)
@@ -138,8 +148,37 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 ## Notes about `overlay2` and `l` folders
 
 Some `overlay2` might be shared across multiple images (if they are identical).
-This is not a problem per se, but as they're full of symlinks it might become an issue when at injection stage.
+This is not a problem per se, but as they're full of symlinks it might become an issue at injection stage.
 
-I've solve that in this PoC by checking if the folder exist before writing it.
-This solution works as I merge all `images` assets _before_ injection.
-If we want to inject multiple images in etcher we need a mechanism to decide how to deal with this situation at the `.etch` level.
+
+## Useful Documentation and Links
+
+[https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html](https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html)
+
+
+
+## WHAT WORKS
+
+
+## WHAT'S BROKEN
+
+1. Files are not correct for image to run
+2. Doesn't find layer - moby check what to do when doesnt find the layer - during injection - in memory db or object - when happens create the database of layers
+
+
+- Extraction image/overlay2/imagedb/metadata/lastUpdated - line-break
+- date has more milliseconds ISO Is there IS with more milliseconds?
+- image/overlay2/imagedb/content is exactly the same 
+
+layerdb/sha256
+
+cache-id - line break
+diff - line break
+size - line break
+parent - line break
+1 byte difference 
+permission also wrong? file type difference
+
+Is encoding wrong
+
+use fs
