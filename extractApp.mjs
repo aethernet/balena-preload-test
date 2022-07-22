@@ -23,8 +23,12 @@ const apps = await fs.readJson(path.join(inPath, "apps.json"))
 /** Extract images name/tag from apps.json */
 const appId = Object.keys(apps.apps)[0]
 const releaseId = Object.keys(apps.apps[appId].releases)[0]
-const images = Object.keys(apps.apps[appId].releases[releaseId].services).map((key) => apps.apps[appId].releases[releaseId].services[key].image)
+const services = Object.keys(apps.apps[appId].releases[releaseId].services)
+console.log('services =>', services)
 
+// Map runs in parallel, do we need to change this too? I can't tell because I only have one service.
+const images = services.map((key) => apps.apps[appId].releases[releaseId].services[key].image)
+console.log('images =>', images)
 /** Use scopio to pull images from the registry */
 // We should process image in sequence instead of parallel to avoid clash with shared layers (or have a smarter optimization mechanism)
 for (const image of images) {
