@@ -27,7 +27,7 @@ const images = Object.keys(apps.apps[appId].releases[releaseId].services).map((k
 
 /** Use scopio to pull images from the registry */
 // We should process image in sequence instead of parallel to avoid clash with shared layers (or have a smarter optimization mechanism)
-for (const image in images) {
+for (const image of images) {
   const imageUrl = image.split("@")[0]
   const commitHash = image.split("@")[1]
   await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
