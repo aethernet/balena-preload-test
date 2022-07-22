@@ -222,6 +222,8 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 ## TODO: 
 - automate the retrieval of `apps.json` (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the fake device).
+- replace `skopeo` with either a npm module to interact with `docker registry v2` or direct call the the api.
+- remove `fs` from the mix and do all transformation in memory then directly stream to the tarball archive.
 
 ## Known limitations and (maybe) important difference between extracted and generated method
 - in layerdb we skiped the creation `split-tar.json.gz` as it's related to distribution. It's used to ensure we can recreate the exact same tarball for a layer from the `diff` folder content and therefore upload back to a registry the same layer (with the same hash -> same name). Uploading an image to a registry from a preloaded app is not in the scope of those script, so we're not generating this file.
