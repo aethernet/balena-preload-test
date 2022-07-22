@@ -7,33 +7,6 @@ import { makeDirectories, makeFiles } from './utilities.mjs'
 
 $.verbose = false
 
-// import utilities from './utilities.mjs'
-// const { makeDirectories, makeFiles } = utilities
-
-// bootstrap-tool.mjs
-// import { $, argv, cd, chalk, fs, question, which } from 'zx'
-// import { getEnv } from "./env"
-
-// // ============================================================
-// // UTILITIES
-// // create folders tree
-// const makeDirectory = ((directory) => {
-//   if (!fs.existsSync(directory)){
-//     fs.mkdirSync(directory.pathStr, 
-//       { recursive: true, mode: directory.mode }
-//     )
-//   }
-// })
-// const makeDirectories = (paths) => paths.forEach(makeDirectory)
-
-// const makeFile = ((fileInfo) => fs.writeFileSync(fileInfo.name, 
-//   fileInfo.val,
-//   { mode: fileInfo.mode }
-// ))
-// const makeFiles = (files) => files.forEach(makeFile)
-// // UTILITIES
-// // ============================================================
-
 const imageUrl = argv.imageUrl ?? "registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5"
 const commitHash = argv.commitHash ?? "sha256:0ae9a712a8c32ac04b91d659a9bc6d4bb2e76453aaf3cfaf036f279262f1f100"
 
@@ -45,9 +18,6 @@ const user = argv.user ?? "u_edwin3"
 const token = argv.token ?? (await $`cat < ./api_key`)
 
 // utilities
-// CON: uses extra library, doesn't really need to be cryptographically secure 
-// PRO: works, more random/ less likely collisions
-// Questions: Not sure if this is slower
 const generateLinkId = () => crypto.randomBytes(13).toString('hex').toUpperCase()
 const generateCacheId = () => crypto.randomBytes(32).toString('hex')
 
@@ -86,7 +56,6 @@ const tgzLayersDigest = manifestJson.layers.map((layer) => ({
   size: layer.size,
 }))
 
-// TO HERE
 // rename all files to have .tar.gz
 // gunzip to get the tar
 // sha256sum to get the digest -> this will gets us the diffId for that layer, here we should check that it match imageJson's diff_ids (and that we have all of them)
@@ -98,7 +67,6 @@ const tgzLayersDigest = manifestJson.layers.map((layer) => ({
 // keeping the size of the layer handy for future use (not that useful, the actual size of the layer is different)
 // genereating a random 26 char for the linkid
 
-// NEXT
 const osType = await $`uname -a`
 const isLinux = osType.stdout.includes('Linux')
 
@@ -114,9 +82,7 @@ const digests = await Promise.all(
     return {
       gzipid: digest,
       cacheid: generateCacheId(),
-      // layerid -- 
-      // openSSL is !isLinux -- 
-      // stdout: 'SHA256(/tmp/in/images/53b00bed7a4c6897db23eb0e4cf620e3/b719094246b80b7ef8cd085c784ef033c8ac9d92addd1b56c343cfdb591465e6.tar)= 0408d3df8f00fc2cdfb6302cc5b2ca8be3a9e1240ad3dd0eb8aa38aab0a6aa59\n',
+      // layerid; uese openSSL if on macos (!isLinux) as it's shiped by default
       layerid: isLinux ? layerDigestRes.stdout.split(" ")[0] : layerDigestRes.stdout.split(" ")[1].split("\n")[0],
       size,
       linkid: generateLinkId(),
@@ -139,7 +105,23 @@ const digests = await Promise.all(
 })
 
 // prebuild a chain of linkid path to use in overlays2's `lower` files
-const linkIdFullChain = digests.map((digest) => `l/${digest.linkid}`)
+// Note about shared layers across images :
+// If some group of layers are shared across different images, their chainid would be identical
+// Therefore we won't duplicate them on disk and reuse the one already there
+// It means we also need to use the existing `link` and build `lower` accordingly for all upper layers
+// Solution is to : 
+// 1. Check for chainid already on disk
+// 2. If found get `link` for the corresponding cache (overlay2) and place it in the link chain
+// 3. If not found use the generated one (link will be created later using that name)
+const linkIdFullChain = digests.map((digest) => {
+  if (fs.existsSync(`${baseOutPath}/image/overlay2/layerdb/sha256/${digest.chainid}`)) {
+    const cacheid = fs.readFileSync(`${baseOutPath}/image/overlay2/layerdb/sha256/${digest.chainid}/cache-id`, {encoding: 'utf8'})
+    const link = fs.readFileSync(`${baseOutPath}/overlay2/${cacheid}/link`, {encoding: 'utf8'})
+    console.log(`--------------> found existing link : ${link} for layer ${digest.chainid} with cache ${cacheid}`)
+    return `l/${link}`
+  }
+  return `l/${digest.linkid}`
+})
 
 const imageDirectories = [
     {pathStr: `${baseOutPath}/image/overlay2/imagedb/content/sha256`, mode: '0777'},
