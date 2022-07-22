@@ -34,7 +34,7 @@ console.log('images =>', images)
 for (const image of images) {
   const imageUrl = image.split("@")[0]
   const commitHash = image.split("@")[1]
-  await $`./static-v3.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
+  await $`./static.mjs --imageUrl ${imageUrl} --commitHash ${commitHash} ${argv.skipDownload ? '--skipDownload':''}`
 }
 
 // tarball everything for injection
