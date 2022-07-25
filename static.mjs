@@ -34,11 +34,12 @@ makeDirectories(baseDirectories)
 if (!argv.skipDownload)
   console.log(`=====> getting ${imageUrl}`)
   // await $`skopeo inspect ${`docker://${imageUrl}`} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
-  // await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
+  await $`skopeo copy ${`docker://${imageUrl}`} dir:${path.join(baseInPath)} --override-os linux --override-arch amd64 --src-creds ${user}:${token}`
 console.log(`=> got ${imageUrl} archive; processing`)
   
-const manifest = await pullManifestFromRegistry(imageUrl, {user, token})
-await fs.writeFileSync(`${path.join(baseInPath)}/manifest.json`, JSON.stringify(manifest, null, 2));
+// TODO comment this in if you want to replace scopeo copy to get the registry manifest
+// const manifest = await pullManifestFromRegistry(imageUrl, {user, token})
+// await fs.writeFileSync(`${path.join(baseInPath)}/manifest.json`, JSON.stringify(manifest, null, 2));
 
 const manifestJson = await fs.readJson(path.join(baseInPath, "manifest.json"))
 
@@ -66,7 +67,7 @@ const tgzLayersDigest = await Promise.all(manifestJson.layers.map(async (layer) 
     digest: layer.digest.split(":")[1],
     size: layer.size,
   }
-  // TODO Get blobs
+  // TODO Get blobs - this has moved to the getManifest.mjs file
   // GET /v2/<name>/blobs/<digest></digest>
   // const layerUrl = `${imageUrl}/blobs/${layerInfo.digest}`
   // const manifest = await pullManifestFromRegistry(layerUrl, {user, token})

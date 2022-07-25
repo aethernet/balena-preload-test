@@ -6,13 +6,16 @@ import { fs } from 'zx';
 import { inspect } from 'util';
 
 /*
-  This should get the manifest from the registry.
-  The manifest is the json that contains the layers and config.
+  This should authenticate to the registry api, get a token,
+  Get the manifest from the registry and get the blobs.
+ 
   TODO: work on functions getHeadBlob then getBlob
 
   How to run:
   npm i
   node getManifest.mjs
+
+  You can also replace scopeo with this but it's currently only getting the manifest, not the blobs.
 */
 
 
