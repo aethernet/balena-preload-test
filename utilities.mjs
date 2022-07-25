@@ -1,26 +1,18 @@
+import * as tar from "tar-stream"
+
 // ============================================================
 // UTILITIES
 
 // create folders tree
-const makeDirectory = ((directory) => {
-    if (!fs.existsSync(directory)){
-      fs.mkdirSync(directory.pathStr, 
-        { 
-          recursive: true, 
-          mode: directory.mode 
-        }
-      );
-    }
-  });
+const makeDirectory = ({ directory, pack }) => pack.entry({ name: directory.name, mode: directory.mode, type: "folder" })
+const makeFile = ({ file, pack }) => pack.entry({ name: file.name, mode: file.mode }, file.val)
 
-export const makeDirectories = (paths) => paths.forEach(makeDirectory);
-  
-const makeFile = ((fileInfo) => fs.writeFileSync(fileInfo.name, 
-    fileInfo.val,
-    { mode: fileInfo.mode }
-  ))  
+// Symlinks are not that easy, the right linkname is not yet known
+const makeSymlink = ({ link, pack }) => pack.entry({ name: link.name, mode: link.mode, type: "symlink", linkname: link.target })
 
-export const makeFiles = (files) => files.forEach(makeFile);
+export const makeDirectories = ({ paths, pack }) => paths.forEach((directory) => makeDirectory({ directory, pack }))
+export const makeFiles = ({ files, pack }) => files.forEach((file) => makeFile({ file, pack }))
+export const makeSymlinks = ({ links, pack }) => links.forEach((link) => makeSymlink({ link, pack }))
 
 // UTILITIES
 // ============================================================
