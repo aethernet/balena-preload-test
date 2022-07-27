@@ -119,47 +119,9 @@ function makeBlobUrl(image, digest) {
 
 
 /*
-TODO getHeadBlob
-This should do HEAD check to make sure blob/layer exists
-
-Might another Token for the blobs
-  https://gist.github.com/sajayantony/a043cc880ad0eb9dda7e3b4d26f0eb25
-OR deal with the jwk header?
-
-Getting this error
-headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'docker-distribution-api-version': 'registry/2.0',
-      'www-authenticate': 'Bearer realm="https://api.77105551e3a8a66011f16b1fe82bc504.bob.local/auth/v1/token",service="registry2.77105551e3a8a66011f16b1fe82bc504.bob.local",scope="repository:53b00bed7a4c6897db23eb0e4cf620e3:pull",error="insufficient_scope"',
-      'x-content-type-options': 'nosniff',
-      date: 'Mon, 25 Jul 2022 23:58:20 GMT',
-      'content-length': '175',
-      connection: 'close'
-    },
-
-
- TODO deal with jwk header from end of config response
-  signatures: [
-    {
-      header: {
-        jwk: {
-          crv: 'P-256',
-          kid: 'AOSN:UPQD:DVBY:6IY3:M4XW:K6WG:5L3W:JEA4:C5TC:SRGM:Z7RW:AJHB',
-          kty: 'EC',
-          x: 'iJGpggVLArK05uLSaFOqLwj-U8CZPJ0XDCh0hUU1fnU',
-          y: 'zxRTk6kF9BlHAg9ZOhOmTx1vX-P59rxPIH-y1sXJnmo'
-        },
-        alg: 'ES256'
-      },
-      signature: 'aCF6z17EZ15JerqLzeg7Hm20k9hdLPZ_XINlUS9sod-Ty9EAr0cC4GJYHGtx1YNO-6m5kaf8DhVrfivDRlr6Wg',
-      protected: 'eyJmb3JtYXRMZW5ndGgiOjI2OTg0LCJmb3JtYXRUYWlsIjoiQ24wIiwidGltZSI6IjIwMjItMDctMjZUMDE6MDc6MDhaIn0'
-    },
-    [length]: 1
-  ]
-
-  https://stackoverflow.com/questions/38312354/insufficient-scope-error-with-docker-registry-v2-and-curl
+  GET /v2/<name>/blobs/<digest>
+  WORKS
 */
-
 async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
   const options = {
     "method": "HEAD",
@@ -212,60 +174,6 @@ async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
   }
 }
 
-/*
- * Verify a manifest JWS (JSON Web Signature)
- *
- * This mimicks
- *      func Verify(sm *SignedManifest) ([]libtrust.PublicKey, error)
- * in "docker/vendor/src/github.com/docker/distribution/manifest/verify.go"
- * which calls
- *      func (js *JSONSignature) Verify() ([]PublicKey, error)
- * in "docker/vendor/src/github.com/docker/libtrust/jsonsign.go"
- *
- * TODO: find an example with `signatures.*.header.chain` to test that path
- *
- * @param jws {Object} A JWS object parsed from `_jwsFromManifest`.
- * @throws {errors.ManifestVerificationError} if there is a problem.
- */
-function _verifyJws(jws) {
-  var encodedPayload = base64url(jws.payload);
-
-  /*
-   * Disallow the "none" algorithm because while the `jws` module might have
-   * a guard against
-   *      // JSSTYLED
-   *      https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
-   * why bother allowing it?
-   */
-  var disallowedAlgs = ['none'];
-
-  for (var i = 0; i < jws.signatures.length; i++) {
-      var jwsSig = jws.signatures[i];
-      var alg = jwsSig.header.alg;
-      if (disallowedAlgs.indexOf(alg) !== -1) {
-          throw new errors.ManifestVerificationError(
-              {jws: jws, i: i}, 'disallowed JWS signature algorithm:', alg);
-      }
-
-      // TODO: Find Docker manifest example using 'header.chain'
-      // and implement this. See "jsonsign.go#Verify".
-      if (jwsSig.header.chain) {
-          throw new errors.InternalError({jws: jws, i: i},
-              'JWS verification with a cert "chain" is not implemented: %j',
-              jwsSig.header.chain);
-      }
-
-      // `mod_jws.verify` takes the JWS compact representation.
-      var jwsCompact = jwsSig['protected'] + '.' + encodedPayload +
-          '.' + jwsSig.signature;
-      var verified = mod_jws.verify(jwsCompact, alg, jwsSig.header.jwk);
-      if (!verified) {
-          throw new errors.ManifestVerificationError(
-              {jws: jws, i: i}, 'JWS signature %d failed verification', i);
-      }
-  }
-}
-
 // WORKS
 // passing in Tag (manifest.config.digest) will get the config.digest.
 // https://{registry}/v2/{imageName}/manifests/{tag}
@@ -286,82 +194,6 @@ async function getConfig(image, token, manifest, baseInPath) {
   } catch (error) {
     throw new Error(`\n\n==> getConfig => ERROR: ${error}`);
   }
-}
-
-function _jwsFromManifest(manifest, body) {
-  assert.object(manifest, 'manifest');
-  assert.buffer(body, 'body');
-
-  var formatLength;
-  var formatTail;
-  var jws = {
-      signatures: []
-  };
-
-  for (var i = 0; i < manifest.signatures.length; i++) {
-      var sig = manifest.signatures[i];
-
-      try {
-          var protectedHeader = JSON.parse(
-              base64url.decode(sig['protected']));
-      } catch (protectedErr) {
-          throw new restifyErrors.InvalidContentError(protectedErr, fmt(
-              'could not parse manifest "signatures[%d].protected": %j',
-              i, sig['protected']));
-      }
-      if (isNaN(protectedHeader.formatLength)) {
-          throw new restifyErrors.InvalidContentError(fmt(
-              'invalid "formatLength" in "signatures[%d].protected": %j',
-              i, protectedHeader.formatLength));
-      } else if (formatLength === undefined) {
-          formatLength = protectedHeader.formatLength;
-      } else if (protectedHeader.formatLength !== formatLength) {
-          throw new restifyErrors.InvalidContentError(fmt(
-              'conflicting "formatLength" in "signatures[%d].protected": %j',
-              i, protectedHeader.formatLength));
-      }
-
-      if (!protectedHeader.formatTail ||
-          typeof (protectedHeader.formatTail) !== 'string')
-      {
-          throw new restifyErrors.InvalidContentError(fmt(
-              'missing "formatTail" in "signatures[%d].protected"', i));
-      }
-      var formatTail_ = base64url.decode(protectedHeader.formatTail);
-      if (formatTail === undefined) {
-          formatTail = formatTail_;
-      } else if (formatTail_ !== formatTail) {
-          throw new restifyErrors.InvalidContentError(fmt(
-              'conflicting "formatTail" in "signatures[%d].protected": %j',
-              i, formatTail_));
-      }
-
-      var jwsSig = {
-          header: {
-              alg: sig.header.alg,
-              chain: sig.header.chain
-          },
-          signature: sig.signature,
-          'protected': sig['protected']
-      };
-      if (sig.header.jwk) {
-          try {
-              jwsSig.header.jwk = jwkToPem(sig.header.jwk);
-          } catch (jwkErr) {
-              throw new restifyErrors.InvalidContentError(jwkErr, fmt(
-                  'error in "signatures[%d].header.jwk": %s',
-                  i, jwkErr.message));
-          }
-      }
-      jws.signatures.push(jwsSig);
-  }
-
-  jws.payload = Buffer.concat([
-      body.slice(0, formatLength),
-      new Buffer(formatTail)
-  ]);
-
-  return jws;
 }
 
 function makeManifestUrl(image) {
