@@ -5,6 +5,8 @@ import dockerParseImage from 'docker-parse-image';
 import { fs } from 'zx';
 import { inspect } from 'util';
 import path from 'path';
+import jwkToPem from 'jwk-to-pem';
+import mod_jws from 'jws';
 
 /*
   This should authenticate to the registry api, get a token,
@@ -36,6 +38,7 @@ Notice how we get back the image Id on Docker-Content-Digest header, as specifie
 
 // https://docs.docker.com/registry/spec/api/
 // https://github.com/dlgmltjr0925/docker-registry-web/blob/cbab3f214d3d47be3c93d1b5ab969f7b711663fc/utils/dockerRegistry.ts
+// https://github.com/TritonDataCenter/node-docker-registry-client/blob/master/lib/registry-client-v2.js
 // https://github.com/moby/moby/issues/9015
 // https://github.com/containers/skopeo/blob/main/cmd/skopeo/copy.go
 // https://github.com/mafintosh/docker-parse-image/blob/master/index.js
@@ -157,55 +160,109 @@ headers: {
   https://stackoverflow.com/questions/38312354/insufficient-scope-error-with-docker-registry-v2-and-curl
 */
 
-async function getHeadBlob(image, token, manifest, config, baseInPath) {
+async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
   const options = {
     "method": "HEAD",
     "headers": {
-      // "Accept": "application/vnd.docker.distribution.manifest.v2+json",
+      "Accept": 'application/vnd.docker.distribution.manifest.v2+json',
       "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-      "Content-Type": 'application/vnd.docker.image.rootfs.diff.tar.gzip',
-      // "Content-Type": 'application/vnd.docker.container.image.v1+json',
-      "Accept-Encoding": "*",
-      ...config.signatures[0].header
     },
   }
-  
-  // let digest = '94274425ee063cf3c983f54c16d65411506f1602fb30c7911965225a463a2376'
-  // digest = 'bce5c272ff6548145aa920ec50b4e7715c05730731e0ac9d07847050ec584f39'
+  console.log(image, '===> getHeadBlob image');
+  const host = 'https://registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/v2/53b00bed7a4c6897db23eb0e4cf620e3'
+  const url = `${ host}/blobs/${configDigest}`;
+  console.log(url, '===> getHeadBlob url')
   try {
-    const headCache = {};
-    const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-    // const tgzLayersDigest = await Promise.all(config.fsLayers.map(async (layer) => {
-      // const blob = layer.blobSum.split(":")[1];
-      // const blob = layer.digest.split(":")[1];
-      const blob = layer.blobSum;
-      const url = makeBlobUrl(image,  blob);
-      const res = await axios.head(url, options);
+    const res = await axios.head(url, options);
+    console.log('==> getHeadBlob res.data', await res.data)
+    console.log('==> getHeadBlob res.headers', await res.headers)
 
-      console.log('\n\n==> getHeadBlob res headers', inspect(await res.headers, true, 10, true))
-      console.log('=\n\n=> getHeadBlob res data', inspect(await res.data, true, 10, true))
-      if (await res.status === 404) {
-        console.error('==> blob not found', layerInfo.digest);
-        headCache[layerInfo.digest] = 'failed';
-        return
-      }
+    // const headCache = {};
+    // const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
+    // // const tgzLayersDigest = await Promise.all(config.fsLayers.map(async (layer) => {
+    //   // const blob = layer.blobSum.split(":")[1];
+    //   // const blob = layer.digest.split(":")[1];
+    //   const blob = layer.blobSum;
+    //   const url = makeBlobUrl(image,  blob);
+    //   const res = await axios.head(url, options);
+
+    //   console.log('\n\n==> getHeadBlob res headers', inspect(await res.headers, true, 10, true))
+    //   // console.log('=\n\n=> getHeadBlob res data', inspect(await res.data, true, 10, true))
+    //   if (await res.status === 404) {
+    //     console.error('==> blob not found', layerInfo.digest);
+    //     headCache[layerInfo.digest] = 'failed';
+    //     return
+    //   }
 
 
-      // Response Should get these from server after HEAD request
-      // "content-length": 171,
-      // "docker-content-digest": digest,
-      if (layerInfo.digest === res.headers['docker-content-digest']) {
-        headCache[layerInfo.digest] = 'success';
-        return layerInfo;
-      }
-      headCache[layerInfo.digest] = 'fail';
-      return layerInfo
-    }))
+    //   // Response Should get these from server after HEAD request
+    //   // "content-length": 171,
+    //   // "docker-content-digest": digest,
+    //   if (layerInfo.digest === res.headers['docker-content-digest']) {
+    //     headCache[layerInfo.digest] = 'success';
+    //     return layerInfo;
+    //   }
+    //   headCache[layerInfo.digest] = 'fail';
+    //   return layerInfo
+    // }))
 
   } catch (error) {
-    console.log('==> getHeadBlob error', error)
+    console.error('==> getHeadBlob error', error)
     // throw new Error(`\n\n==> getHeadBlob => ERROR: ${error}`);
+  }
+}
+
+/*
+ * Verify a manifest JWS (JSON Web Signature)
+ *
+ * This mimicks
+ *      func Verify(sm *SignedManifest) ([]libtrust.PublicKey, error)
+ * in "docker/vendor/src/github.com/docker/distribution/manifest/verify.go"
+ * which calls
+ *      func (js *JSONSignature) Verify() ([]PublicKey, error)
+ * in "docker/vendor/src/github.com/docker/libtrust/jsonsign.go"
+ *
+ * TODO: find an example with `signatures.*.header.chain` to test that path
+ *
+ * @param jws {Object} A JWS object parsed from `_jwsFromManifest`.
+ * @throws {errors.ManifestVerificationError} if there is a problem.
+ */
+function _verifyJws(jws) {
+  var encodedPayload = base64url(jws.payload);
+
+  /*
+   * Disallow the "none" algorithm because while the `jws` module might have
+   * a guard against
+   *      // JSSTYLED
+   *      https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
+   * why bother allowing it?
+   */
+  var disallowedAlgs = ['none'];
+
+  for (var i = 0; i < jws.signatures.length; i++) {
+      var jwsSig = jws.signatures[i];
+      var alg = jwsSig.header.alg;
+      if (disallowedAlgs.indexOf(alg) !== -1) {
+          throw new errors.ManifestVerificationError(
+              {jws: jws, i: i}, 'disallowed JWS signature algorithm:', alg);
+      }
+
+      // TODO: Find Docker manifest example using 'header.chain'
+      // and implement this. See "jsonsign.go#Verify".
+      if (jwsSig.header.chain) {
+          throw new errors.InternalError({jws: jws, i: i},
+              'JWS verification with a cert "chain" is not implemented: %j',
+              jwsSig.header.chain);
+      }
+
+      // `mod_jws.verify` takes the JWS compact representation.
+      var jwsCompact = jwsSig['protected'] + '.' + encodedPayload +
+          '.' + jwsSig.signature;
+      var verified = mod_jws.verify(jwsCompact, alg, jwsSig.header.jwk);
+      if (!verified) {
+          throw new errors.ManifestVerificationError(
+              {jws: jws, i: i}, 'JWS signature %d failed verification', i);
+      }
   }
 }
 
@@ -220,10 +277,91 @@ async function getConfig(image, token, manifest, baseInPath) {
   try {
     const res = await axios.get(url, options);
     fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
+    console.log(await res.headers, '==> getConfig res.headers' )
+    console.log(await res.data, '==> getConfig res.data')
+    console.log(await inspect(res.data.signatures[0].header), '==> getConfig res.data.signatures[0].header')
+    // const verified = await _verifyJws(signatures[0].header.jws)
+    // console.log(verified, '==> getConfig verified \n\n')
     return await res.data;
   } catch (error) {
     throw new Error(`\n\n==> getConfig => ERROR: ${error}`);
   }
+}
+
+function _jwsFromManifest(manifest, body) {
+  assert.object(manifest, 'manifest');
+  assert.buffer(body, 'body');
+
+  var formatLength;
+  var formatTail;
+  var jws = {
+      signatures: []
+  };
+
+  for (var i = 0; i < manifest.signatures.length; i++) {
+      var sig = manifest.signatures[i];
+
+      try {
+          var protectedHeader = JSON.parse(
+              base64url.decode(sig['protected']));
+      } catch (protectedErr) {
+          throw new restifyErrors.InvalidContentError(protectedErr, fmt(
+              'could not parse manifest "signatures[%d].protected": %j',
+              i, sig['protected']));
+      }
+      if (isNaN(protectedHeader.formatLength)) {
+          throw new restifyErrors.InvalidContentError(fmt(
+              'invalid "formatLength" in "signatures[%d].protected": %j',
+              i, protectedHeader.formatLength));
+      } else if (formatLength === undefined) {
+          formatLength = protectedHeader.formatLength;
+      } else if (protectedHeader.formatLength !== formatLength) {
+          throw new restifyErrors.InvalidContentError(fmt(
+              'conflicting "formatLength" in "signatures[%d].protected": %j',
+              i, protectedHeader.formatLength));
+      }
+
+      if (!protectedHeader.formatTail ||
+          typeof (protectedHeader.formatTail) !== 'string')
+      {
+          throw new restifyErrors.InvalidContentError(fmt(
+              'missing "formatTail" in "signatures[%d].protected"', i));
+      }
+      var formatTail_ = base64url.decode(protectedHeader.formatTail);
+      if (formatTail === undefined) {
+          formatTail = formatTail_;
+      } else if (formatTail_ !== formatTail) {
+          throw new restifyErrors.InvalidContentError(fmt(
+              'conflicting "formatTail" in "signatures[%d].protected": %j',
+              i, formatTail_));
+      }
+
+      var jwsSig = {
+          header: {
+              alg: sig.header.alg,
+              chain: sig.header.chain
+          },
+          signature: sig.signature,
+          'protected': sig['protected']
+      };
+      if (sig.header.jwk) {
+          try {
+              jwsSig.header.jwk = jwkToPem(sig.header.jwk);
+          } catch (jwkErr) {
+              throw new restifyErrors.InvalidContentError(jwkErr, fmt(
+                  'error in "signatures[%d].header.jwk": %s',
+                  i, jwkErr.message));
+          }
+      }
+      jws.signatures.push(jwsSig);
+  }
+
+  jws.payload = Buffer.concat([
+      body.slice(0, formatLength),
+      new Buffer(formatTail)
+  ]);
+
+  return jws;
 }
 
 function makeManifestUrl(image) {
@@ -235,18 +373,60 @@ function makeManifestUrl(image) {
   return manifestUrl;
 }
 
-
+/**
+ * GET /v2/<name>/manifests/<reference>
+ * Host: <registry host>
+ * Authorization: <scheme> <token>
+ */
 async function getManifest(image, token, options = {}) {
-  const manifestOptions = createAuthTokenHeaderOptions(token, options);
-  const manifestUrl = makeManifestUrl(image);
+  const optionsManifest = createAuthTokenHeaderOptions(token, options);
+  const url = makeManifestUrl(image);
   try {
-    const res = await fetchFromRegistry(manifestUrl, manifestOptions, 'getManifest');
+    const res = await axios.get(url, optionsManifest);
+    // console.log('\n\n\n ==> 1 getManifest res headers', inspect(await res.headers, true, 10, true))
+    // console.log('==> 1 getManifest res data', inspect(await res.data, true, 10, true))
+    
+    // optionsManifest.headers.Accept =
+    //       "application/vnd.docker.distribution.manifest.v2+json";
+    // const res2 = await axios.get(url, options);
+    const digest = res.headers["docker-content-digest"];
+
+    // console.log('\n\n\n ==> 1 getManifest digest', inspect(digest, true, 10, true))
+    // console.log('\n\n\n ==> 2 getManifest digest', inspect(res.data, true, 10, true))
     fs.writeFileSync(`${baseInPath}/manifest.json`, JSON.stringify(await res.data, null, 2));
-    return await res.data;
+    // return await res.data;
+    return { ...res.data, digest };
+
   } catch (error) {
     throw new Error(`==> Nope did not get registry manifest data. ERROR: ${error}`);
   }
 }
+
+/**
+ * GET /v2/<name>/manifests/<reference>
+ * Host: <registry host>
+ * Authorization: <scheme> <token>
+ */
+//  export const getManifests = async ({
+//   host,
+//   authorization,
+//   name,
+//   reference,
+// }: GetManifestsArgs): Promise<GetManifestsResponse | undefined> => {
+//   try {
+//     const configs: AxiosRequestConfig = {};
+//     if (authorization) configs.headers = { Authorization: authorization };
+//     const url = getRegistyUrl(host, `/${name}/manifests/${reference}`);
+//     const res1 = await axios.get<Manifest>(url, configs);
+//     configs.headers.Accept =
+//       "application/vnd.docker.distribution.manifest.v2+json";
+//     const res2 = await axios.get<DistributionManifest>(url, configs);
+//     const digest = res2.headers["docker-content-digest"] as string;
+//     return { ...res1.data, digest };
+//   } catch (error) {
+//     throw handleError(error);
+//   }
+// };
 
 const  getToken = async (image, options, authResponse, tag) => {
   try {
@@ -260,6 +440,7 @@ const  getToken = async (image, options, authResponse, tag) => {
       },
       ...options,
     };
+    console.log('\n\n\n ==> getToken tokenOptions', inspect(tokenOptions, true, 10, true))
     const tokenResponse = await fetchFromRegistry(authResponse.realm, tokenOptions, 'getToken');
     if (!tokenResponse.data.token) throw new Error("token registry fail.");
     return await tokenResponse.data.token;
@@ -281,7 +462,7 @@ const  getToken = async (image, options, authResponse, tag) => {
 // 	return request('GET', `/v2/${name}/blobs/${digest}`, `repository:${name}:pull`);
 // }
 
-const getRealmResponse = async (image, options) => {
+async function getRealmResponse(image, options) {
   // parse auth response for the realm and service params provided by registry
   let realmOptions = { 
     method: 'GET',
@@ -289,6 +470,7 @@ const getRealmResponse = async (image, options) => {
     ...options, 
   };
   const url = getRegistryUrl(image)
+  console.log(url, '==> getRealmUrl url\n\n\n ')
   try {
     const res = await axios.head(url, realmOptions);
     if (res.headers['www-authenticate'] === undefined) {
@@ -316,20 +498,45 @@ const getAuthHeaders = async (options) => {
         password: options?.password
     },
   }
+
+  // TODO - add cert support
+  // # cert_manager=$(DOCKER_HOST=${uuid}.local docker ps \
+  //   #   --filter "name=cert-manager" \
+  //   #   --format "{{.ID}}")
+  //   # echo $cert_manager
+    
+  //   # DOCKER_HOST=${uuid}.local docker cp ${cert_manager}:/certs/private/ca-bundle.${balena_device_uuid}.${tld}.pem balena/
+  //   # echo $DOCKER_HOST
+    
+  //   export NODE_EXTRA_CA_CERTS="/Users/rose/Documents/balena-io/balena-cloud/balena/ca-bundle.${balena_device_uuid}.${tld}.pem"
+  //   echo $NODE_EXTRA_CA_CERTS
+    
+  //   # * ⚠️ add CA root certificates and mark trusted (e.g. macOS):
+  //   sudo security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain ${NODE_EXTRA_CA_CERTS}
+    
 }
 
 export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
   const authHeaders = getAuthHeaders(userInfo);
+  console.log('\n\n==> authHeaders', authHeaders);
   const authResponseForRealm = await getRealmResponse(image, authHeaders);
   console.log('\n\n==> authResponseForRealm', authResponseForRealm);
   const token = await getToken(image, authHeaders, authResponseForRealm);
   console.log('\n\n==> token', token);
+  console.log('\n\n==> HERE  manifest' ); 
   const manifest = await getManifest(image, await token, authHeaders, baseInPath);
-  console.log('\n\n==> manifest', manifest); 
+  const configDigest = manifest.config.digest;
+  console.log(configDigest,'==> HERE  manifest configDigest \n\n', ); 
+  console.log(manifest.digest,'==> HERE  manifest manifest.digest \n\n', ); 
+  const digests = manifest.layers.map(layer => layer.digest);
+  console.log(digests, '==> HERE  manifest digests\n\n'); 
 
   const config = await getConfig(image, await token, manifest, baseInPath);
-  console.log('\n\n==> config', inspect(config,true,10,true)); 
-  const blob = await getHeadBlob(image, await token, manifest, await config, baseInPath);
+  const fsLayers = config.fsLayers.map(fslayer => fslayer.blobSum);
+  console.log(inspect(fsLayers,true,10,true), '==> config fsLayers \n\n'); 
+  const layerArray = [configDigest, manifest.digest, ...fsLayers,  ...digests];
+  // blob = fetch_blob(docker_image, auth, manifest)
+  const blob = await getHeadBlob(image, await token, manifest, configDigest, fsLayers);
   // const layers = await getBlobs(image, await token, manifest, baseInPath);
   // console.log(layers,'=====> layers')
   return manifest;
