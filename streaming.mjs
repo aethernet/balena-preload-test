@@ -5,12 +5,6 @@ import tar from "tar-stream"
 import digestStream from "digest-stream"
 import path from "path"
 
-const setImmediate =
-  (1, eval)("this").setImmediate ||
-  function (fn) {
-    setTimeout(fn, 0)
-  }
-
 // variables
 const app_id = "ed91bdb088b54a3b999576679281520a"
 const release_id = "2f24cd2be3006b029911a3d0da6837d5"
