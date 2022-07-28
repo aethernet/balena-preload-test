@@ -10,3 +10,4 @@ out_injectable
 *.zip
 success/*
 diff/*
+node_modules/*
