@@ -78,34 +78,34 @@ function createAuthTokenHeaderOptions(token) {
           "Authorization": `Bearer ${token}`
       }}}
 
-// TODO Finish getBlobs once getHeadBlobs is working
+// TODO Finish getBlobs
 // GET /v2/<name>/blobs/<digest></digest>
 // This should pull the blob from the registry after checking head.
-async function getBlobs(image, token, manifest, baseInPath) {
+async function getBlobs(image, token, configDigest, contentLength) {
   const options = {
-    "method": "get",
+    "method": "GET",
     "headers": {
       "Authorization": `Bearer ${token}`,
-      "Accept-Encoding": "gzip, deflate, br",
-      "Accept": "application/vnd.docker.distribution.manifest.v2+json",
-      // "Content-Type": "application/vnd.docker.distribution.manifest.v1+json",
-      // "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
       // "Content-Type": 'application/vnd.docker.image.rootfs.diff.tar.gzip',
-      // "Content-Type": 'application/vnd.docker.container.image.v1+json',
       // "Accept-Encoding": "br;q=1.0, gzip;q=0.8, *;q=0.1",
-
-      // Should get these from server after HEAD request
-      // "content-length": 171,
-      // "docker-content-digest": digest,
-    }
+      // "Accept-Encoding": "gzip, deflate, br",
+      // "content-length": contentLength,
+    },
   }
-  const imageHash = await manifest.config.digest.split(":")[1]
-  const url = makeBlobUrl(image,  imageHash);
-  const res = await axios.get(url, options);
-  fs.writeFileSync(`${baseInPath}/${imageHash}`, JSON.stringify(res.data, null, 2));
-
-  // TODO iterate through all digests and get blobs
-  
+  console.log(image, '===> getBlob image');
+  const host = 'https://registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/v2/53b00bed7a4c6897db23eb0e4cf620e3'
+  const url = `${ host}/blobs/${configDigest}`;
+  console.log(url, '===> getBlob url')
+  try {
+    const res = await axios.get(url, options);
+    console.log('==> getBlob res.data', await res.data)
+    fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
+    console.log('==> getBlob res.headers', await res.headers)
+  } catch (error) {
+    console.error('==> getBlob error', error)
+    // throw new Error(`\n\n==> getBlob => ERROR: ${error}`);
+  }
 }
 
 function makeBlobUrl(image, digest) {
@@ -138,7 +138,13 @@ async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
     const res = await axios.head(url, options);
     console.log('==> getHeadBlob res.data', await res.data)
     console.log('==> getHeadBlob res.headers', await res.headers)
-
+    if (res.headers['content-length'] && res.headers['docker-content-digest'] === configDigest) {
+      console.log('==> getHeadBlob res.headers["content-length"]', res.headers['content-length'])
+      console.log('==> getHeadBlob res.headers["docker-content-digest"]', res.headers['docker-content-digest'])
+      console.log('==> getHeadBlob configDigest', configDigest)
+      return res.headers['content-length'];
+    }
+    return 0;
     // const headCache = {};
     // const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
     // // const tgzLayersDigest = await Promise.all(config.fsLayers.map(async (layer) => {
@@ -184,7 +190,7 @@ async function getConfig(image, token, manifest, baseInPath) {
   const configDigestName = manifest.config.digest.split(":")[1];
   try {
     const res = await axios.get(url, options);
-    fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
+    // fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
     console.log(await res.headers, '==> getConfig res.headers' )
     console.log(await res.data, '==> getConfig res.data')
     console.log(await inspect(res.data.signatures[0].header), '==> getConfig res.data.signatures[0].header')
@@ -358,19 +364,20 @@ export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
   console.log('\n\n==> HERE  manifest' ); 
   const manifest = await getManifest(image, await token, authHeaders, baseInPath);
   const configDigest = manifest.config.digest;
-  console.log(configDigest,'==> HERE  manifest configDigest \n\n', ); 
-  console.log(manifest.digest,'==> HERE  manifest manifest.digest \n\n', ); 
+  // console.log(configDigest,'==> HERE  manifest configDigest \n\n', ); 
+  console.log(manifest.config,'==> HERE  manifest manifest.config \n\n', ); 
   const digests = manifest.layers.map(layer => layer.digest);
-  console.log(digests, '==> HERE  manifest digests\n\n'); 
+  // console.log(digests, '==> HERE  manifest digests\n\n'); 
 
   const config = await getConfig(image, await token, manifest, baseInPath);
   const fsLayers = config.fsLayers.map(fslayer => fslayer.blobSum);
-  console.log(inspect(fsLayers,true,10,true), '==> config fsLayers \n\n'); 
+  // console.log(inspect(fsLayers,true,10,true), '==> config fsLayers \n\n'); 
   const layerArray = [configDigest, manifest.digest, ...fsLayers,  ...digests];
   // blob = fetch_blob(docker_image, auth, manifest)
-  const blob = await getHeadBlob(image, await token, manifest, configDigest, fsLayers);
-  // const layers = await getBlobs(image, await token, manifest, baseInPath);
-  // console.log(layers,'=====> layers')
+  const contentLength = await getHeadBlob(image, await token, manifest, configDigest, fsLayers);
+  console.log(contentLength,'=====> contentLength')
+  const layers = await getBlobs(image, await token, configDigest, contentLength);
+  console.log(layers,'=====> layers')
   return manifest;
 }
 
