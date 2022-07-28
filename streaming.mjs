@@ -6,8 +6,19 @@ import digestStream from "digest-stream"
 import path from "path"
 
 // variables
-const app_id = "ed91bdb088b54a3b999576679281520a"
-const release_id = "2f24cd2be3006b029911a3d0da6837d5"
+const app_id = "7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a"
+const release_id = "302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5"
+const balenaosRef = "expanded-aarch64.img.zip"
+
+/** 
+ * Get repositories.json for a balenaos version
+ * //TODO: this should be stored on S3 along the expanded version of os, in the meantime getting this from local fs
+ * @param {string} balenaosRef - balenaos we want to get the repositories for
+ * @return {json} repositories.json
+ */
+const getRepositoriesJsonFor = async (baleneosVersion) => {
+  return await fs.readJson(path.join(__dirname, "in", `baleneosVersion.repositories.json`))
+}
 
 /**
  * Get Apps.json from api
@@ -31,8 +42,8 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
   const imageKeys = Object.keys(appsJson.apps?.[app_id]?.releases?.[release_id]?.services)
   const imageNames = imageKeys.map((key) => appsJson.apps?.[app_id]?.releases?.[release_id]?.services[key].image)
   return imageNames.map((image) => {
-    const [image_name, commit] = image.split("@")
-    return { image_name, commit }
+    const [image_name, image_hash] = image.split("@")
+    return { image_name, image_hash }
   })
 }
 
@@ -44,9 +55,10 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
  */
 const getDistributionManifests = async (images) =>
   await Promise.all(
-    images.map(async ({ image_name }) => ({
+    images.map(async ({ image_name, image_hash }) => ({
       manifest: await fs.readJson(path.join(__dirname, "in", "images", image_name.split("/").reverse()[0], "manifest.json")),
       image_name,
+      image_hash,
     }))
   )
 
@@ -58,10 +70,11 @@ const getDistributionManifests = async (images) =>
  */
 const getImageManifests = async (distributionManifests) =>
   await Promise.all(
-    distributionManifests.map(async ({ manifest, image_name }) => ({
+    distributionManifests.map(async ({ manifest, image_name, image_hash }) => ({
       manifest: await fs.readJson(path.join(__dirname, "in", "images", image_name.split("/").reverse()[0], manifest.config.digest.split(":")[1])),
       image_id: manifest.config.digest.split(":")[1],
       image_name,
+      image_hash,
     }))
   )
 
@@ -261,7 +274,8 @@ for (const { layer, image_name } of processingLayers) {
 
 // 9. Add the `images` related files
 const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
-for (const { manifest, image_id, image_name } of imageManifests) {
+const repositories = []
+for (const { manifest, image_id, image_name, image_hash } of imageManifests) {
   console.log("add image =>", image_id, image_name)
 
   await packEntry({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), mode: "0o644" }, JSON.stringify(manifest))
@@ -269,7 +283,24 @@ for (const { manifest, image_id, image_name } of imageManifests) {
     { name: path.join(dockerImageOverlay2Imagedb, "metadata", "sha256", image_id, "lastUpdated"), mode: "0o644" },
     new Date().toISOString()
   )
+
+  // prepare repositories
+  repositories[image_name] = {
+    [`${image_name}:latest`]: `sha256:${image_id}`,
+    [`${image_name}:@${image_hash}`]: `sha256:${image_id}`,
+  }
 }
 
-// 10. Close the tarball
+// 10. merge repositories.json
+// TODO: this should be done by downloading the `repositories.json` linked to the balenaos image we're going to stream
+// Those files shouls be placed in s3 along the expanded .img so we don't need to extract it each time we serve an image
+// In the meantime I'll take one from the `in` folder
+const repositoriesJson = getRepositoriesJsonFor(balenaosRef)
+for (const repository of repositories) {
+  repositoriesJson[repository] = {...repository}
+}
+
+await packEntry({name: path.join("docker", "image", "overlay2"), mode: "0o644" }, JSON.stringify(repositoriesJson))
+
+// 11. Close the tarball
 pack.finalize()
