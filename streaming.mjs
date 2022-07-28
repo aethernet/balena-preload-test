@@ -129,9 +129,9 @@ const layerStreamProcessing = (layerStream, pack, cache_id) =>
 
 /**
  * Promise : packEntry
- * Promisify tar.pack.entry
- * @param {object} header - tar.pack.entry header
- * @param {string} value - tar.pack.entry value
+ * Promisify tar-stream.pack.entry ( https://www.npmjs.com/package/tar-stream )
+ * @param {object} header - tar-stream.pack.entry header
+ * @param {string} value - tar-stream.pack.entry value
  * @returns {Promise}
  * */
 const packEntry = (header, value, callback) =>
@@ -227,7 +227,7 @@ for (const { layer, image_name } of processingLayers) {
   // attach the cache_id with all (in case of duplicates) diff_id
   const cache_id = crypto.randomBytes(32).toString("hex")
 
-  console.log(layer, image_name)
+  console.log("add layer =>", layer, image_name)
 
   // processing the stream
   try {
@@ -265,5 +265,17 @@ for (const { layer, image_name } of processingLayers) {
   }
 }
 
-// 9. Close the tarball
+// 9. Add the `images` related files
+const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
+for (const { manifest, image_id, image_name } of imageManifests) {
+  console.log("add image =>", image_id, image_name)
+
+  await packEntry({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), mode: "0o644" }, JSON.stringify(manifest))
+  await packEntry(
+    { name: path.join(dockerImageOverlay2Imagedb, "metadata", "sha256", image_id, "lastUpdated"), mode: "0o644" },
+    new Date().toISOString()
+  )
+}
+
+// 10. Close the tarball
 pack.finalize()
