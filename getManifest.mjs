@@ -1,19 +1,9 @@
-import https from 'https';
 import axios from 'axios';
-// import fetch from 'fetch';
 import dockerParseImage from 'docker-parse-image';
 import { fs } from 'zx';
 import { inspect } from 'util';
-import * as stream from 'stream';
-import { promisify } from 'util';
 
-const finished = promisify(stream.finished);
-import path from 'path';
-// import jwkToPem from 'jwk-to-pem';
-// import mod_jws from 'jws';
-// import fetch from 'node-fetch';
-
-/*
+/**
   This should authenticate to the registry api, get a token,
   Get the distribution manifest, the manifest from the registry and get the blobs.
 
@@ -25,7 +15,7 @@ import path from 'path';
 */
 
 
-/* 
+/**
 ** /v2/<name>/manifests/<reference>
 ** /v2/<name>/blobs/<digest>
 
@@ -55,6 +45,7 @@ https://github.com/viraja1/decentralized_docker_hub_registry/blob/782de6b84532c7
 https://github.com/bmonty/docker-manifest
 https://github.com/viraja1/decentralized_docker_hub_registry/blob/782de6b84532c70c51049b3aec35a177998f089a/hub/server.js
 https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/packages/hypod-server/source/server/data/constants/docker/index.ts
+https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */ 
 
 function getRegistryUrl(image) {
@@ -71,12 +62,10 @@ function createManifestOptions(token) {
       }}}
 
 
-/* TODO: iterate through all blobs, compare sizes, and download the ones that are missing
-** /v2/<name>/blobs/<digest>
-** https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
+/** getAllBlobs
+  /v2/<name>/blobs/<digest>
 */
 async function getAllBlobs(image, token, manifest, baseInPath) {
-  
   const options = {
     "method": "GET",
     "headers": {
@@ -89,74 +78,47 @@ async function getAllBlobs(image, token, manifest, baseInPath) {
    const headCache = {};
    const host = 'https://registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/v2/53b00bed7a4c6897db23eb0e4cf620e3'
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-
-      console.log('\n\n==> getAllBlob response layer', inspect(await layer, true, 2, true))
       const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
       options.url = `${host}/blobs/${layer.digest}`;
       const { data, headers } = await axios(options)
-      // if (!(data instanceof stream)) console.log('Not stream');
-      console.log('\n\n==> getAllBlob response layer', inspect(await layer, true, 2, true))
-      console.log('\n\n==> getAllBlob response headers', inspect(await headers, true, 2, true))
-      // console.log('\n\n==> getAllBlob response data', inspect(await data, true, 10, true))
-      if ((headers['content-length'] === layer.size) 
+      if ((parseInt(headers['content-length']) === layer.size) 
         && (headers['docker-content-digest'] === layer.digest)) {
           writer.write(data);
           writer.end();
-        }
-
-      // if (await headers.status === 404) {
-      //   console.error('==> blob not found', layer.digest);
-      //   headCache[layer.digest] = 'failed';
-      //   return headCache
-      // }
-      headCache[layer.digest] = 'success';
-      return headCache
+          console.log('\n\n==> getAllBlob layer done writing:', inspect(await layer, true, 2, true))
+      } else {
+        console.error('\n\n==> getAllBlob layer failed:', inspect(await layer, true, 2, true))
+        console.error('==> getAllBlob layer failed response headers', inspect(await headers, true, 2, true))
+      }
     }))
 }
 
-// TODO Finish getBlobs
-// GET /v2/<name>/blobs/<digest></digest>
-// This should pull the blob from the registry after checking head.
+/** getConfigBlob
+  This should pull the blob from the registry after checking head.
+  GET /v2/<name>/blobs/<digest>
+  GET example /v2/53b00bed7a4c6897db23eb0e4cf620e3/blobs/sha256:1aa86408ad62437344cee93c2be884ad802fc63e05795876acec6de0bb21f3cc
+*/
 async function getBlobs(image, token, configDigest, contentLength,baseInPath) {
   const options = {
     "method": "GET",
     "headers": {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-      // "Content-Type": 'application/vnd.docker.image.rootfs.diff.tar.gzip',
-      // "Accept-Encoding": "br;q=1.0, gzip;q=0.8, *;q=0.1",
-      // "Accept-Encoding": "gzip, deflate, br",
-      // "content-length": contentLength,
     },
   }
-  console.log(image, '===> getBlob image');
   const host = 'https://registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/v2/53b00bed7a4c6897db23eb0e4cf620e3'
-  const url = `${ host}/blobs/${configDigest}`;
-  console.log(url, '===> getBlob url')
+  const url = `${host}/blobs/${configDigest}`;
   try {
-    const res = await axios.get(url, options);
-    console.log('==> getBlob res.data', await res.data)
-    fs.writeFileSync(`${baseInPath}/${configDigest}`, JSON.stringify(await res.data, null, 2));
-    console.log('==> getBlob res.headers', await res.headers)
-
-    
+    const { data } = await axios.get(url, options);
+    fs.writeFileSync(`${baseInPath}/${configDigest}`, JSON.stringify(await data, null, 2));
+    return await data;
   } catch (error) {
     console.error('==> getBlob error', error)
     // throw new Error(`\n\n==> getBlob => ERROR: ${error}`);
   }
 }
 
-function makeBlobUrl(image, digest) {
-  // registry spec https://docs.docker.com/registry/spec/api/
-  const parsedImage = dockerParseImage(image);
-  const baseRegistry = getRegistryUrl(image);
-  const {repository, namespace} = parsedImage;
-  const url = `${baseRegistry}${repository}/blobs/${digest}`;
-  return url;
-}
-
-
-/*
+/** getHeadBlob
   GET /v2/<name>/blobs/<digest>
   WORKS
 */
@@ -168,59 +130,28 @@ async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
       "Authorization": `Bearer ${token}`,
     },
   }
-  console.log(image, '===> getHeadBlob image');
   const host = 'https://registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/v2/53b00bed7a4c6897db23eb0e4cf620e3'
   const url = `${ host}/blobs/${configDigest}`;
-  console.log(url, '===> getHeadBlob url')
   try {
-    const res = await axios.head(url, options);
-    console.log('==> getHeadBlob res.data', await res.data)
-    console.log('==> getHeadBlob res.headers', await res.headers)
-    if (res.headers['content-length'] && res.headers['docker-content-digest'] === configDigest) {
-      console.log('==> getHeadBlob res.headers["content-length"]', res.headers['content-length'])
-      console.log('==> getHeadBlob res.headers["docker-content-digest"]', res.headers['docker-content-digest'])
+    const { data, headers } = await axios.head(url, options);
+    if (headers['content-length'] && headers['docker-content-digest'] === configDigest) {
+      console.log('==> getHeadBlob headers["content-length"]', headers['content-length'])
+      console.log('==> getHeadBlob headers["docker-content-digest"]', headers['docker-content-digest'])
       console.log('==> getHeadBlob configDigest', configDigest)
-      return res.headers['content-length'];
+      return headers['content-length'];
     }
     return 0;
-    // const headCache = {};
-    // const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-    // // const tgzLayersDigest = await Promise.all(config.fsLayers.map(async (layer) => {
-    //   // const blob = layer.blobSum.split(":")[1];
-    //   // const blob = layer.digest.split(":")[1];
-    //   const blob = layer.blobSum;
-    //   const url = makeBlobUrl(image,  blob);
-    //   const res = await axios.head(url, options);
-
-    //   console.log('\n\n==> getHeadBlob res headers', inspect(await res.headers, true, 10, true))
-    //   // console.log('=\n\n=> getHeadBlob res data', inspect(await res.data, true, 10, true))
-    //   if (await res.status === 404) {
-    //     console.error('==> blob not found', layerInfo.digest);
-    //     headCache[layerInfo.digest] = 'failed';
-    //     return
-    //   }
-
-
-    //   // Response Should get these from server after HEAD request
-    //   // "content-length": 171,
-    //   // "docker-content-digest": digest,
-    //   if (layerInfo.digest === res.headers['docker-content-digest']) {
-    //     headCache[layerInfo.digest] = 'success';
-    //     return layerInfo;
-    //   }
-    //   headCache[layerInfo.digest] = 'fail';
-    //   return layerInfo
-    // }))
-
   } catch (error) {
     console.error('==> getHeadBlob error', error)
     // throw new Error(`\n\n==> getHeadBlob => ERROR: ${error}`);
   }
 }
 
-// WORKS
-// passing in Tag (manifest.config.digest) will get the config.digest.
-// https://{registry}/v2/{imageName}/manifests/{tag}
+/** getConfig
+  GET /v2/<name>/manifests/<digest>
+  passing in Tag (manifest.config.digest) will get the config.digest.
+  WORKS
+*/
 async function getConfig(image, token, manifest, baseInPath) {
   const options = createManifestOptions(token);
   options.headers.Accept = "application/vnd.docker.container.image.v2+json";
@@ -308,18 +239,6 @@ const  getToken = async (image, options, authResponse, tag) => {
     throw new Error('Failed to get authentication token from registry.');
   }
 }
-
-// async function blob(name, digest) {
-// 	const { headers } = await request('HEAD', `/v2/${name}/blobs/${digest}`, `repository:${name}:pull`);
-// 	return {
-// 		dockerContentDigest: headers.get('Docker-Content-Digest'),
-// 		contentLength: parseInt(headers.get('Content-Length'), 10),
-// 	};
-// }
-
-// async function configBlob(name, digest) {
-// 	return request('GET', `/v2/${name}/blobs/${digest}`, `repository:${name}:pull`);
-// }
 
 async function getRealmResponse(image, options) {
   // parse auth response for the realm and service params provided by registry
