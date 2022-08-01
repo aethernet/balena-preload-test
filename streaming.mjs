@@ -1,9 +1,14 @@
-#!/usr/bin/env zx
 import crypto from "crypto"
 import gunzip from "gunzip-maybe"
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import path from "path"
+
+// FIXME: Those import are uses for mocks, should eventually be removed
+import fs from "fs-extra"
+import { fileURLToPath } from "url"
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // variables
 const app_id = "ed91bdb088b54a3b999576679281520a"
