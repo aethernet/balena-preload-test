@@ -48,18 +48,10 @@ https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/pa
 https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */ 
 
-function getRegistryUrl(image) {
-  const parsedImage = dockerParseImage(image);
-  if (parsedImage.registry) return `https://${parsedImage.registry}/v2/`;
-  return 'https://registry2.balena-cloud.com/v2/';
+function getRegistryUrl({ registry }) {
+  if (!registry) return 'https://registry2.balena-cloud.com/v2/';
+  return `https://${registry}/v2/`;
 }
-
-function createManifestOptions(token) {
-  return {
-      "headers": {
-          "Accept": "application/vnd.docker.distribution.manifest.v2+json",
-          "Authorization": `Bearer ${token}`
-      }}}
 
 
 /** getAllBlobs
@@ -93,12 +85,12 @@ async function getAllBlobs(image, token, manifest, baseInPath) {
     }))
 }
 
-/** getConfigBlob
+/** getDistributionManifest
   This should pull the blob from the registry after checking head.
   GET /v2/<name>/blobs/<digest>
   GET example /v2/53b00bed7a4c6897db23eb0e4cf620e3/blobs/sha256:1aa86408ad62437344cee93c2be884ad802fc63e05795876acec6de0bb21f3cc
 */
-async function getBlobs(image, token, configDigest, contentLength,baseInPath) {
+async function getConfigManifest(image, token, configDigest, contentLength, baseInPath) {
   const options = {
     "method": "GET",
     "headers": {
@@ -110,7 +102,7 @@ async function getBlobs(image, token, configDigest, contentLength,baseInPath) {
   const url = `${host}/blobs/${configDigest}`;
   try {
     const { data } = await axios.get(url, options);
-    fs.writeFileSync(`${baseInPath}/${configDigest}`, JSON.stringify(await data, null, 2));
+    fs.writeFileSync(`${baseInPath}/${configDigest.split(':')[1]}`, JSON.stringify(await data, null, 2));
     return await data;
   } catch (error) {
     console.error('==> getBlob error', error)
@@ -122,7 +114,7 @@ async function getBlobs(image, token, configDigest, contentLength,baseInPath) {
   GET /v2/<name>/blobs/<digest>
   WORKS
 */
-async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
+async function getHeadBlob(image, token, configDigest) {
   const options = {
     "method": "HEAD",
     "headers": {
@@ -152,24 +144,24 @@ async function getHeadBlob(image, token, manifest,configDigest,fsLayers) {
   passing in Tag (manifest.config.digest) will get the config.digest.
   WORKS
 */
-async function getConfig(image, token, manifest, baseInPath) {
-  const options = createManifestOptions(token);
-  options.headers.Accept = "application/vnd.docker.container.image.v2+json";
-  const url = makeManifestUrl(image, manifest.config.digest);
-  const configDigestName = manifest.config.digest.split(":")[1];
-  try {
-    const res = await axios.get(url, options);
-    fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
-    console.log(await res.headers, '==> getConfig res.headers' )
-    console.log(await res.data, '==> getConfig res.data')
-    console.log(await inspect(res.data.signatures[0].header), '==> getConfig res.data.signatures[0].header')
-    // const verified = await _verifyJws(signatures[0].header.jws)
-    // console.log(verified, '==> getConfig verified \n\n')
-    return await res.data;
-  } catch (error) {
-    throw new Error(`\n\n==> getConfig => ERROR: ${error}`);
-  }
-}
+// async function getConfig(image, token, manifest, baseInPath) {
+//   const options = createManifestOptions(token);
+//   options.headers.Accept = "application/vnd.docker.container.image.v2+json";
+//   const url = makeManifestUrl(image, manifest.config.digest);
+//   const configDigestName = manifest.config.digest.split(":")[1];
+//   try {
+//     const res = await axios.get(url, options);
+//     fs.writeFileSync(`${baseInPath}/${configDigestName}`, JSON.stringify(await res.data, null, 2));
+//     console.log(await res.headers, '==> getConfig res.headers' )
+//     console.log(await res.data, '==> getConfig res.data')
+//     console.log(await inspect(res.data.signatures[0].header), '==> getConfig res.data.signatures[0].header')
+//     // const verified = await _verifyJws(signatures[0].header.jws)
+//     // console.log(verified, '==> getConfig verified \n\n')
+//     return await res.data;
+//   } catch (error) {
+//     throw new Error(`\n\n==> getConfig => ERROR: ${error}`);
+//   }
+// }
 
 /**
  * GET /v2/<name>/manifests/<reference>
@@ -240,17 +232,17 @@ const  getToken = async (image, options, authResponse, tag) => {
   }
 }
 
-async function getRealmResponse(image, options) {
+async function getRealmResponse(url, options) {
   // parse auth response for the realm and service params provided by registry
   let realmOptions = { 
     method: 'GET',
+    url,
     validateStatus: status => status === 401,
     ...options, 
   };
-  const url = getRegistryUrl(image)
-  console.log(url, '==> getRealmUrl url\n\n\n ')
+  console.log(options, '==> getRealmResponse options\n\n\n ')
   try {
-    const res = await axios.head(url, realmOptions);
+    const res = await axios(realmOptions);
     if (res.headers['www-authenticate'] === undefined) {
       throw new Error('unsupported scheme');
     }
@@ -269,11 +261,11 @@ async function getRealmResponse(image, options) {
   }
 }
 
-function getAuthHeaders(options) {
+async function getAuthHeaders(options) {
   return {
     auth: {
         username: options?.user,
-        password: options?.password
+        password: options?.password || await fs.readFileSync('~/.balena/token', 'utf8'),
     },
   }
 
@@ -296,34 +288,40 @@ function getAuthHeaders(options) {
 
 
 export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
-
-  
   const authHeaders = getAuthHeaders(userInfo);
   console.log('\n\n==> authHeaders', authHeaders);
-  const authResponseForRealm = await getRealmResponse(image, authHeaders);
+
+  const parsedImage = dockerParseImage(image);
+  const registryUrl = getRegistryUrl(parsedImage);
+
+  const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
   console.log('\n\n==> authResponseForRealm', authResponseForRealm);
+
   const token = await getToken(image, authHeaders, authResponseForRealm);
   console.log('\n\n==> token', token);
-  console.log('\n\n==> HERE  manifest' ); 
+
   const manifest = await getManifest(image, await token, authHeaders, baseInPath);
-  
-  console.log(manifest,'==> HERE  manifest manifest \n\n', ); 
+  console.log('\n\n==> manifest', manifest);
   const configDigest = manifest.config.digest;
   console.log(manifest.config,'==> HERE  manifest manifest.config \n\n', ); 
-  const digests = manifest.layers.map(layer => layer.digest);
-  // console.log(digests, '==> HERE  manifest digests\n\n'); 
+  const digests = manifest.layers.map(layer => ({digest: layer.digest, digest: layer.size}));
 
-  const config = await getConfig(image, await token, manifest, baseInPath);
-  const fsLayers = config.fsLayers.map(fslayer => fslayer.blobSum);
-  // console.log(inspect(fsLayers,true,10,true), '==> config fsLayers \n\n'); 
-  const contentLength = await getHeadBlob(image, await token, manifest, configDigest, fsLayers);
+  // We are not using this manifest as its V1
+  // const config = await getConfig(image, await token, manifest, baseInPath);
+  // console.log(inspect(config,true,10,true), '==> config config \n\n');
+
+  const contentLength = await getHeadBlob(image, await token, manifest, configDigest);
   console.log(contentLength,'=====> contentLength')
-  const layers = await getBlobs(image, await token, configDigest, contentLength, baseInPath);
-  console.log(layers,'=====> layers')
-  const allBlobAlltheTime = await getAllBlobs(image, await token, manifest, baseInPath);
-  console.log(allBlobAlltheTime,'=====> allBlobAlltheTime');
-  console.log( image,'image HERE ==> \n\n');
-  return manifest;
+
+    // We are using this manifest as its V2
+  const configManifestV2 = await getConfigManifest(image, await token, configDigest, contentLength, baseInPath);
+  console.log(await configManifestV2.rootfs,'=====> configManifestV2.rootfs')
+
+  // const allBlobAlltheTime = await getAllBlobs(image, await token, manifest, baseInPath);
+  // console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
+
+  // console.log( image,'image HERE ==> \n\n');
+  return { manifest, digests, configManifestV2 };
 }
 
 const image = 'registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/53b00bed7a4c6897db23eb0e4cf620e3'
