@@ -3,7 +3,7 @@ import gunzip from "gunzip-maybe"
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import path from "path"
-import { pullManifestFromRegistry } from "./getManifest.mjs"
+// import { pullManifestFromRegistry } from "./getManifest.mjs"
 
 // FIXME: Those import are uses for mocks, should eventually be removed
 import fs from "fs-extra"
@@ -163,20 +163,12 @@ const packEntry = (header, value, callback) =>
 const appsJson = await getAppsJson({ app_id, release_id })
 
 // const registryManifests = await pullManifestFromRegistry(image);
+
 // 2. extract image_ids from appsJson
 const images = await extractImageIdsFromAppsJson({ appsJson, app_id, release_id })
 
 // 3. get distribution manifests from registry
 const distributionManifests = await getDistributionManifests(images)
-/**
- * Download Manifest
- * //TODO: should be a call to the registry
- * @param {[]string} images - array of images
- * @returns {[]json} - array of distribution manifests
- */
-
- console.log(manifest, digests, configManifestV2, 'manifest, digests, configManifestV2')
-
 
 // 4. get the image manifests from registry
 const imageManifests = await getImageManifests(distributionManifests)
