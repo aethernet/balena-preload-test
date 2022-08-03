@@ -3,17 +3,19 @@ import gunzip from "gunzip-maybe"
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import path from "path"
-// import { pullManifestFromRegistry } from "./getManifest.mjs"
+import { getAuthHeaders } from "./getAuth.mjs"
+import { pullManifestFromRegistry } from "./getManifest.mjs"
 
 // FIXME: Those import are uses for mocks, should eventually be removed
 import fs from "fs-extra"
 import { fileURLToPath } from "url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const baseInPath = path.join(__dirname, "in")
 
 // variables
 const app_id = "ee6c3b3f75ae456d9760171a27a36568" //"7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a" ee6c3b3f75ae456d9760171a27a36568
-const release_id = "609dd0e92e2c379b0b42b83d131ee454" //"302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
+const release_id = "7e27e701c0e15a34c85881f0e1e53896" //"302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
 const balenaosRef = "expanded-aarch64.img.zip"
 
 /** 
@@ -51,6 +53,17 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
     const [image_name, image_hash] = image.split("@")
     return { image_name, image_hash }
   })
+}
+
+/**
+ * downloadFilesForFsToRead
+ * @param {string} images - registry url with repository and namespace
+ * @returns {{[]}object} - list of {manifest, configManifest, digests}
+ */
+const downloadFilesForFsToRead = async (images) => {
+  await Promise.all(
+    images.map(async (image) => (pullManifestFromRegistry(image)))
+  )
 }
 
 /**
@@ -158,14 +171,17 @@ const packEntry = (header, value, callback) =>
 // ##############
 // Processing
 // ##############
+// 0. Get authHeaders
+const authHeaders = getAuthHeaders()
 
 // 1. get apps.json
 const appsJson = await getAppsJson({ app_id, release_id })
 
-// const registryManifests = await pullManifestFromRegistry(image);
-
 // 2. extract image_ids from appsJson
 const images = await extractImageIdsFromAppsJson({ appsJson, app_id, release_id })
+
+// 2.2/4. download files for fs to read
+const registryManifests = await downloadFilesForFsToRead(images, authHeaders, baseInPath);
 
 // 3. get distribution manifests from registry
 const distributionManifests = await getDistributionManifests(images)

@@ -22,8 +22,8 @@ console.log(' bobAddress',  bobAddress);
 const uuid = '7710555';
 console.log('uuid', uuid);
 
-
-const username = await $`(balena whoami | grep USERNAME | cut -c11-)` ?? bob;
+const username = 'bob';
+// const username = await $`(balena whoami | grep USERNAME | cut -c11-)` ?? 'bob';
 let api_key = await $`(cat < ~/.balena/token)`;
 
 //https://dashboard.77105551e3a8a66011f16b1fe82bc504.bob.local/devices/a6facb7b455dd99e9eb8ba3930c0b85b/summar
@@ -37,21 +37,21 @@ const tld = 'bob.local';
 const versionAppJson = '4';
 
 // create folders tree
-const makeDirectory = ((directory) => {
-  if (!fs.existsSync(directory)){
-    fs.mkdirSync(directory.pathStr, 
-      { recursive: true, mode: directory.mode }
-    );
-  }
-});
-const makeDirectories = (paths) => paths.forEach(makeDirectory);
-const inPath = '/tmp/in'
-const outPath = '/tmp/out';
+// const makeDirectory = ((directory) => {
+//   if (!fs.existsSync(directory)){
+//     fs.mkdirSync(directory.pathStr, 
+//       { recursive: true, mode: directory.mode }
+//     );
+//   }
+// });
+// const makeDirectories = (paths) => paths.forEach(makeDirectory);
+const inPath = 'in'
+const outPath = 'out';
 const workDirectories = [
     {pathStr: inPath, mode: 766},
     {pathStr: outPath, mode: 766},
 ]
-makeDirectories(workDirectories);
+// makeDirectories(workDirectories);
 
 const configPath = `${inPath}/config${versionAppJson}.json`;
 const appsPathVersioned = `${inPath}/apps${versionAppJson}.json`;

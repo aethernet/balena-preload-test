@@ -1,6 +1,5 @@
 import axios from 'axios';
 import dockerParseImage from 'docker-parse-image';
-import os from 'os';
 import { fs } from 'zx';
 import { inspect } from 'util';
 
@@ -55,7 +54,7 @@ function getRegistryUrl({ registry, namespace }) {
 }
 
 // NOTE the double namespace here, why oh why must it be?
-function getRegistryUrlWithRepository({ registry, namespace, repository }) {
+function getImageUrl({ registry, namespace, repository }) {
   return `https://${registry}/${namespace}/${namespace}/${repository}`; 
 }
 
@@ -63,7 +62,7 @@ function getRegistryUrlWithRepository({ registry, namespace, repository }) {
 /** getAllBlobs
   /v2/<name>/blobs/<digest>
 */
-async function getAllBlobs(registryUrlWithRepository, token, manifest, baseInPath) {
+async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
   const options = {
     "method": "GET",
     "headers": {
@@ -76,7 +75,7 @@ async function getAllBlobs(registryUrlWithRepository, token, manifest, baseInPat
   try {
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
       const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
-      options.url = `${registryUrlWithRepository}/blobs/${layer.digest}`;
+      options.url = `${imageUrl}/blobs/${layer.digest}`;
       const { data, headers } = await axios(options)
       if ((parseInt(headers['content-length']) === layer.size) 
         && (headers['docker-content-digest'] === layer.digest)) {
@@ -101,10 +100,10 @@ async function getAllBlobs(registryUrlWithRepository, token, manifest, baseInPat
   GET /v2/<name>/blobs/<digest>
   GET example /v2/53b00bed7a4c6897db23eb0e4cf620e3/blobs/sha256:1aa86408ad62437344cee93c2be884ad802fc63e05795876acec6de0bb21f3cc
 */
-async function getConfigManifest(registryUrlWithRepository, token, digest, baseInPath) {
+async function getConfigManifest(imageUrl, token, digest, baseInPath) {
   const options = {
     "method": "GET",
-    url: `${registryUrlWithRepository}/blobs/${digest}`,
+    url: `${imageUrl}/blobs/${digest}`,
     "headers": {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -123,10 +122,10 @@ async function getConfigManifest(registryUrlWithRepository, token, digest, baseI
 /**
   GET /v2/<name>/blobs/<digest>
 */
-async function getHeadBlob(registryUrlWithRepository, token, digest) {
+async function getHeadBlob(imageUrl, token, digest) {
   const options = {
     "method": "HEAD",
-    "url": `${registryUrlWithRepository}/blobs/${digest}`,
+    "url": `${imageUrl}/blobs/${digest}`,
     "headers": {
       "Accept": 'application/vnd.docker.distribution.manifest.v2+json',
       "Authorization": `Bearer ${token}`,
@@ -146,10 +145,10 @@ async function getHeadBlob(registryUrlWithRepository, token, digest) {
   }
 }
 
-async function getManifest(registryUrlWithRepository, token, authHeaders,baseInPath) {
+async function getManifest(imageUrl, token, authHeaders,baseInPath) {
   const options = {
     "method": "GET",
-    url: `${registryUrlWithRepository}/manifests/latest`,
+    url: `${imageUrl}/manifests/latest`,
     withCredentials: true,
     credentials: 'include',
     "headers": {
@@ -217,43 +216,13 @@ async function getRealmResponse(url, authHeaders) {
 }
 
 
-async function getAuthHeaders(options) {
-  return {
-    auth: {
-      username: options?.user || 'bob',
-      password: options?.password || await fs.readFileSync(`${os.homedir()}/.balena/token`, 'utf8')
-    },
-  }
-}
-
-// TODO - add cert support
-// # cert_manager=$(DOCKER_HOST=${uuid}.local docker ps \
-//   #   --filter "name=cert-manager" \
-//   #   --format "{{.ID}}")
-//   # echo $cert_manager
-
-//   # DOCKER_HOST=${uuid}.local docker cp ${cert_manager}:/certs/private/ca-bundle.${balena_device_uuid}.${tld}.pem balena/
-//   # echo $DOCKER_HOST
-
-//   export NODE_EXTRA_CA_CERTS="/Users/rose/Documents/balena-io/balena-cloud/balena/ca-bundle.${balena_device_uuid}.${tld}.pem"
-//   echo $NODE_EXTRA_CA_CERTS
-
-//   # * ⚠️ add CA root certificates and mark trusted (e.g. macOS):
-//   sudo security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain ${NODE_EXTRA_CA_CERTS}
-
-
-
-
-export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
-  const authHeaders = getAuthHeaders(userInfo);
-  console.log('\n\n==> authHeaders', authHeaders);
-
+export const pullManifestFromRegistry = async (image, authHeaders, baseInPath) => {
   const parsedImage = dockerParseImage(image);
   console.log('\n\n==> parsedImage', parsedImage);
   const registryUrl = getRegistryUrl(parsedImage);
   console.log('\n\n==> registryUrl', registryUrl);
-  const registryUrlWithRepository = getRegistryUrlWithRepository(parsedImage);
-  console.log('\n\n==> registryUrlWithRepository', registryUrlWithRepository);
+  const imageUrl = getImageUrl(parsedImage);
+  console.log('\n\n==> imageUrl', imageUrl);
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
   console.log('\n\n==> authResponseForRealm', authResponseForRealm);
@@ -261,20 +230,20 @@ export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
   const token = await getToken(parsedImage, authHeaders, authResponseForRealm);
   console.log('\n\n==> token', token);
 
-  const manifest = await getManifest(registryUrlWithRepository, await token, authHeaders, baseInPath);
+  const manifest = await getManifest(imageUrl, await token, authHeaders, baseInPath);
   console.log('\n\n==> manifest', manifest);
   const configDigest = manifest.config.digest;
   console.log(manifest.config,'==> HERE  manifest manifest.config \n\n', ); 
   const digests = manifest.layers.map(layer => ({digest: layer.digest, digest: layer.size}));
 
-  const contentLength = await getHeadBlob(registryUrlWithRepository, await token, configDigest);
+  const contentLength = await getHeadBlob(imageUrl, await token, configDigest);
   // console.log(contentLength,'=====> contentLength')
 
     // We are using this manifest as its V2
-  const configManifestV2 = await getConfigManifest(registryUrlWithRepository, await token, configDigest, baseInPath);
+  const configManifestV2 = await getConfigManifest(imageUrl, await token, configDigest, baseInPath);
   console.log(await configManifestV2.rootfs,'=====> configManifestV2.rootfs')
 
-  const allBlobAlltheTime = await getAllBlobs(registryUrlWithRepository, await token, manifest, baseInPath);
+  const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPath);
   console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
 
   // console.log( image,'image HERE ==> \n\n');
@@ -282,8 +251,8 @@ export const pullManifestFromRegistry = async (image, userInfo, baseInPath) => {
 }
 
 
-const image = 'registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/53b00bed7a4c6897db23eb0e4cf620e3'
-const baseInPath = `in/images/${image.split("/").reverse()[0]}`
-const userInfo = null;
+// const image = 'registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/53b00bed7a4c6897db23eb0e4cf620e3'
+// const baseInPath = `in/images/${image.split("/").reverse()[0]}`
+// const userInfo = null;
 
-pullManifestFromRegistry(image, userInfo, baseInPath)
+// pullManifestFromRegistry(image, userInfo, baseInPath)
