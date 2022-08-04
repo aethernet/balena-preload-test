@@ -7,9 +7,21 @@ export const getAuthHeaders = async (options) => {
           username: options?.user || 'bob',
           password: options?.password || await fs.readFileSync(`${os.homedir()}/.balena/token`, 'utf8')
         },
+        "Docker-Distribution-API-Version": 'registry/2.0',
       }
     }
 
+// export const getAuth = async (options) => {
+//     const authHeaders = auth || getAuthHeaders(auth);
+
+  
+//     const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
+//     console.log('\n\n==> authResponseForRealm', authResponseForRealm);
+  
+//     const token = await getToken(parsedImage, authHeaders, authResponseForRealm);
+//     console.log('\n\n==> token', token);
+//     return {token}
+// }
   // TODO - add cert support
   // # cert_manager=$(DOCKER_HOST=${uuid}.local docker ps \
   //   #   --filter "name=cert-manager" \

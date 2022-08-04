@@ -2,6 +2,7 @@ import axios from 'axios';
 import dockerParseImage from 'docker-parse-image';
 import { fs } from 'zx';
 import { inspect } from 'util';
+import { getAuthHeaders } from './getAuth.mjs';
 
 /**
   This should authenticate to the registry api, get a token,
@@ -53,16 +54,16 @@ function getRegistryUrl({ registry, namespace }) {
   return `https://${registry}/${namespace}/`;
 }
 
-// NOTE the double namespace here, why oh why must it be?
+// NOTE the double namespace here, the 1st v2 is for docker Version2, the second is for image release Version2
+// Not sure how to get the image rel
 function getImageUrl({ registry, namespace, repository }) {
   return `https://${registry}/${namespace}/${namespace}/${repository}`; 
 }
 
-
 /** getAllBlobs
   /v2/<name>/blobs/<digest>
 */
-async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
+async function getBlob(imageUrl, token, layer, baseInPath) {
   const options = {
     "method": "GET",
     "headers": {
@@ -70,29 +71,42 @@ async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
       "Accept-Encoding": "gzip",
       "responseType": 'stream',
+      "Docker-Distribution-API-Version": 'registry/2.0',
     },
   }
   try {
+    const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
+    options.url = `${imageUrl}/blobs/${layer.digest}`;
+    const { data, headers } = await axios(options)
+    if ((parseInt(headers['content-length']) === layer.size) 
+      && (headers['docker-content-digest'] === layer.digest)) {
+        writer.write(data);
+        writer.end();
+        console.log('\n\n==> getAllBlob layer done writing:', inspect(await layer, true, 2, true))
+        return layer;
+    } else {
+      console.error('\n\n==> getAllBlob layer failed:', inspect(await layer, true, 2, true))
+      console.error('==> getAllBlob layer failed response headers', inspect(await headers, true, 2, true))
+    }
+  } catch(error) {
+    console.error('\n\n==> getAllBlob error:', inspect(error, true, 2, true))
+  }
+}
+
+/** getAllBlobs
+  Iterate through the layers and get the blobs.
+  This is getting moved over the the mainland. Should it tho?
+
+*/
+async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
+  try {
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-      const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
-      options.url = `${imageUrl}/blobs/${layer.digest}`;
-      const { data, headers } = await axios(options)
-      if ((parseInt(headers['content-length']) === layer.size) 
-        && (headers['docker-content-digest'] === layer.digest)) {
-          writer.write(data);
-          writer.end();
-          console.log('\n\n==> getAllBlob layer done writing:', inspect(await layer, true, 2, true))
-          return layer;
-      } else {
-        console.error('\n\n==> getAllBlob layer failed:', inspect(await layer, true, 2, true))
-        console.error('==> getAllBlob layer failed response headers', inspect(await headers, true, 2, true))
-      }
+      return await getBlob(imageUrl, token, layer, baseInPath)
     }))
     return tgzLayersDigest;
   } catch(error) {
     console.error('\n\n==> getAllBlob error:', inspect(error, true, 2, true))
   }
-
 }
 
 /**
@@ -107,6 +121,7 @@ async function getConfigManifest(imageUrl, token, digest, baseInPath) {
     "headers": {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "Docker-Distribution-API-Version": 'registry/2.0',
     },
   }
   try {
@@ -129,6 +144,8 @@ async function getHeadBlob(imageUrl, token, digest) {
     "headers": {
       "Accept": 'application/vnd.docker.distribution.manifest.v2+json',
       "Authorization": `Bearer ${token}`,
+
+      "Docker-Distribution-API-Version": 'registry/2.0',
     },
   }
   try {
@@ -154,6 +171,8 @@ async function getManifest(imageUrl, token, authHeaders,baseInPath) {
     "headers": {
       "Accept": 'application/vnd.docker.distribution.manifest.v2+json',
       "Authorization": `Bearer ${token}`,
+
+      "Docker-Distribution-API-Version": 'registry/2.0',
     },
   };
   try {
@@ -180,6 +199,7 @@ async function getToken(parsedImage, authHeaders, authResponse, tag) {
       },
       ...authHeaders,
     };
+    console.log(inspect(options, true, 2, true), '==> getToken options:')
     const { data } = await axios(options);
     if (!data.token) throw new Error("token registry fail.");
     return await data.token;
@@ -195,6 +215,7 @@ async function getRealmResponse(url, authHeaders) {
     url,
     validateStatus: status => status === 401,
     ...authHeaders, 
+
   };
   try {
     const { headers } = await axios(options);
@@ -215,14 +236,32 @@ async function getRealmResponse(url, authHeaders) {
   }
 }
 
-
-export const pullManifestFromRegistry = async (image, authHeaders, baseInPath) => {
+export const getUrls = async (image, layer) => {
   const parsedImage = dockerParseImage(image);
   console.log('\n\n==> parsedImage', parsedImage);
-  const registryUrl = getRegistryUrl(parsedImage);
+  const registryUrl = getRegistryUrl(parsedImage, layer);
   console.log('\n\n==> registryUrl', registryUrl);
   const imageUrl = getImageUrl(parsedImage);
   console.log('\n\n==> imageUrl', imageUrl);
+  return { registryUrl, imageUrl, parsedImage };
+}
+
+const makeDirectory = async (directory) => {
+  if (!fs.existsSync(directory)){
+    fs.mkdirSync(directory, 
+      { recursive: true, mode: '0777' }
+    );
+  }
+};
+
+export const pullManifestsFromRegistry = async (image, auth, baseInPath) => {
+  const authHeaders = auth || await getAuthHeaders(auth);
+  const { registryUrl, imageUrl, parsedImage } = await getUrls(image);
+
+
+  const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
+  console.log(baseInPathSub, '\n\n==> baseInPathSub');
+  await makeDirectory(baseInPathSub);
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
   console.log('\n\n==> authResponseForRealm', authResponseForRealm);
@@ -230,25 +269,27 @@ export const pullManifestFromRegistry = async (image, authHeaders, baseInPath) =
   const token = await getToken(parsedImage, authHeaders, authResponseForRealm);
   console.log('\n\n==> token', token);
 
-  const manifest = await getManifest(imageUrl, await token, authHeaders, baseInPath);
+  const manifest = await getManifest(imageUrl, await token, authHeaders, baseInPathSub);
   console.log('\n\n==> manifest', manifest);
   const configDigest = manifest.config.digest;
   console.log(manifest.config,'==> HERE  manifest manifest.config \n\n', ); 
-  const digests = manifest.layers.map(layer => ({digest: layer.digest, digest: layer.size}));
+  const digests = manifest.layers.map(layer => ({digest: layer.digest, size: layer.size}));
 
   const contentLength = await getHeadBlob(imageUrl, await token, configDigest);
   // console.log(contentLength,'=====> contentLength')
 
     // We are using this manifest as its V2
-  const configManifestV2 = await getConfigManifest(imageUrl, await token, configDigest, baseInPath);
+  const configManifestV2 = await getConfigManifest(imageUrl, await token, configDigest, baseInPathSub);
   console.log(await configManifestV2.rootfs,'=====> configManifestV2.rootfs')
+  const diff_ids = await configManifestV2.rootfs.diff_ids;
 
-  const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPath);
-  console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
+  // const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPathSub);
+  // console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
 
   // console.log( image,'image HERE ==> \n\n');
-  return { manifest, digests, configManifestV2 };
+  return { manifest, digests, configDigest, configManifestV2, diff_ids, imageUrl, token };
 }
+
 
 
 // const image = 'registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/53b00bed7a4c6897db23eb0e4cf620e3'
@@ -256,3 +297,4 @@ export const pullManifestFromRegistry = async (image, authHeaders, baseInPath) =
 // const userInfo = null;
 
 // pullManifestFromRegistry(image, userInfo, baseInPath)
+
