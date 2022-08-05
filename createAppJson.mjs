@@ -37,21 +37,21 @@ const tld = 'bob.local';
 const versionAppJson = '4';
 
 // create folders tree
-// const makeDirectory = ((directory) => {
-//   if (!fs.existsSync(directory)){
-//     fs.mkdirSync(directory.pathStr, 
-//       { recursive: true, mode: directory.mode }
-//     );
-//   }
-// });
-// const makeDirectories = (paths) => paths.forEach(makeDirectory);
+const makeDirectory = ((directory) => {
+  if (!fs.existsSync(directory)){
+    fs.mkdirSync(directory.pathStr, 
+      { recursive: true, mode: directory.mode }
+    );
+  }
+});
+const makeDirectories = (paths) => paths.forEach(makeDirectory);
 const inPath = 'in'
 const outPath = 'out';
 const workDirectories = [
     {pathStr: inPath, mode: 766},
     {pathStr: outPath, mode: 766},
 ]
-// makeDirectories(workDirectories);
+makeDirectories(workDirectories);
 
 const configPath = `${inPath}/config${versionAppJson}.json`;
 const appsPathVersioned = `${inPath}/apps${versionAppJson}.json`;
@@ -61,20 +61,13 @@ const appsPath = `${inPath}/apps.json`;
 await $`rm -rf ${inPath}/config* ${inPath}/apps*`;
 
 const configJson = await $`scp -P 22222 root@${deviceAddress}:/mnt/boot/config.json ${configPath}`;
-
 const config = await fs.readJson(configPath);
-
 const deviceId = config.uuid;
-// a6facb7b455dd99e9eb8ba3930c0b85b
 
 const bobApiToken= await $`cat < ~/.balena/token`;
 const appsJsonFull = await $`curl -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${bobApiToken}" \
     -X GET "https://api.${balenaDeviceUuid}.${tld}/device/v3/${deviceId}/state" > ${appsPathVersioned}`
-
-// const appsJsonFull = await $`curl -H "Content-Type: application/json" \
-// -H "Authorization: Bearer ${bobApiToken}" \
-// -X GET "https://api.balena-cloud.com/device/v3/${deviceId}/state" > ${appsPathVersioned}`
 
 const apps = await fs.readJson(appsPathVersioned);
 const appsJson = await apps[deviceId];
@@ -82,15 +75,3 @@ await fs.writeFileSync(appsPath, JSON.stringify(appsJson));
 // console.log('appsJson', appsJson);
 await $`ls ${inPath}/`;
 await $`cat ${appsPath} | jq`;
-
-
-// const curledUrl = await $`curl --upload-file ${appsPath} https://transfer.sh/apps.json`;
-// console.log('curledUrl', curledUrl);
-// ssh to the builder
-// await $`balena ssh ${bobAddress} builder`;
-
-// git clone https://github.com/zoobot/balena-preload-test.git
-
-// copy in the apps.json to the builder 
-// TODO copy it directly how to scp to service without balena scp?
-// await $`curl ${curledUrl} -o balena-preload-test/in/apps.json`;

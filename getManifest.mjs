@@ -3,7 +3,9 @@ import dockerParseImage from 'docker-parse-image';
 import { fs } from 'zx';
 import { inspect } from 'util';
 import { getAuthHeaders } from './getAuth.mjs';
-
+const featureFlags = {
+  justDownload: false,
+}
 /**
   This should authenticate to the registry api, get a token,
   Get the distribution manifest, the manifest from the registry and get the blobs.
@@ -63,7 +65,7 @@ function getImageUrl({ registry, namespace, repository }) {
 /** getAllBlobs
   /v2/<name>/blobs/<digest>
 */
-async function getBlob(imageUrl, token, layer, baseInPath) {
+export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
   const options = {
     "method": "GET",
     "headers": {
@@ -75,18 +77,23 @@ async function getBlob(imageUrl, token, layer, baseInPath) {
     },
   }
   try {
-    const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
+    // const writer = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}`);
     options.url = `${imageUrl}/blobs/${layer.digest}`;
     const { data, headers } = await axios(options)
     if ((parseInt(headers['content-length']) === layer.size) 
       && (headers['docker-content-digest'] === layer.digest)) {
-        writer.write(data);
-        writer.end();
-        console.log('\n\n==> getAllBlob layer done writing:', inspect(await layer, true, 2, true))
-        return layer;
+        console.log(`\n\n==> getting Blob: ${layer.digest} size: ${layer.size}`)
+        const headerSize = headers['content-length'];
+        const layerSize = layer.size;
+        const headerDigest = headers['docker-content-digest'];
+        const layerDigest = layer.digest;
+        console.log(`\n\n==> getBlob: size: ${layer.size} ${headers['content-length']} `);
+        console.log(`\n\n==> getBlob: size: ${layer.digest} \n${headers['docker-content-digest']} `);
+        return await data;
     } else {
       console.error('\n\n==> getAllBlob layer failed:', inspect(await layer, true, 2, true))
-      console.error('==> getAllBlob layer failed response headers', inspect(await headers, true, 2, true))
+      console.error('==> getAllBlob layer failed response headers', inspect(headers, true, 2, true))
+      return { ...layer, error: 'failed'};
     }
   } catch(error) {
     console.error('\n\n==> getAllBlob error:', inspect(error, true, 2, true))
@@ -101,7 +108,11 @@ async function getBlob(imageUrl, token, layer, baseInPath) {
 async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
   try {
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-      return await getBlob(imageUrl, token, layer, baseInPath)
+      const layerStream = fs.createWriteStream(`${baseInPathSub}${layer}`);
+      const dataBlob = await getBlob(imageUrl, token, layer, baseInPath)
+      layerStream.write(await dataBlob);
+      layerStream.end();
+      return await dataBlob
     }))
     return tgzLayersDigest;
   } catch(error) {
@@ -283,8 +294,10 @@ export const pullManifestsFromRegistry = async (image, auth, baseInPath) => {
   console.log(await configManifestV2.rootfs,'=====> configManifestV2.rootfs')
   const diff_ids = await configManifestV2.rootfs.diff_ids;
 
-  // const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPathSub);
-  // console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
+  if (featureFlags.justDownload) {
+    const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPathSub);
+    console.log(await allBlobAlltheTime,'=====> allBlobAlltheTime');
+  }
 
   // console.log( image,'image HERE ==> \n\n');
   return { manifest, digests, configDigest, configManifestV2, diff_ids, imageUrl, token };

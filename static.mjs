@@ -1,17 +1,9 @@
 #!/usr/bin/env zx
 // #! /usr/bin/env node
 
-<<<<<<< HEAD
-import crypto from 'crypto'
-import path from 'path'
-import {inspect} from 'util'
-import { makeDirectories, makeFiles } from './utilities.mjs'
-import { pullManifestFromRegistry } from './getManifest.mjs'
-=======
 import crypto from "crypto"
 import path from "path"
 import { makeDirectories, makeFiles } from "./utilities.mjs"
->>>>>>> a38445adb891394ed70385a9af873b7da681ad5b
 
 $.verbose = false
 
