@@ -3,6 +3,7 @@
     "digest-stream": "^2.0.0",
     "fs-extra": "^10.1.0",
     "gunzip-maybe": "^1.4.2",
-    "tar-stream": "^2.2.0"
+    "tar-stream": "^2.2.0",
+    "zlib": "^1.0.5"
   }
 }

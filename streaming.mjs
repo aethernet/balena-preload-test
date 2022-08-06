@@ -1,5 +1,6 @@
 import crypto from "crypto"
 import gunzip from "gunzip-maybe"
+import zlib from 'zlib';
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import dockerParseImage from 'docker-parse-image';
@@ -57,17 +58,6 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
 }
 
 /**
- * downloadFilesForFsToRead
- * @param {string} images - registry url with repository and namespace
- * @returns {{[]}object} - list of {manifest, configManifest, digests}
- */
-const downloadFilesForFsToRead = async (images) => {
-  await Promise.all(
-    images.map(async (image) => (pullManifestFromRegistry(image)))
-  )
-}
-
-/**
  * Download Distribution Manifest
  * //TODO: should be a call to the registry, until that code is ready, i'm faking it using fs
  * @param {[]string} images - array of images
@@ -106,43 +96,62 @@ const computeChainId = ({ previousChainId, diff_id }) => crypto.createHash("sha2
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-// const layerStreamProcessing = (layerStream, pack, cache_id) =>
-//   new Promise((resolve, reject) => {
-//     const extract = tar.extract()
+const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, layer) =>
+  new Promise((resolve, reject) => {
+    const tarStreamExtract = tar.extract()
 
-//     // will hold diff_id value once the hash is done
-//     let diff_id = null
-//     let size = -1
+    // will hold diff_id value once the hash is done
+    let diff_id = null
+    let size = -1
 
-    // const digestedCb = (digest, length) => {
-    //   diff_id = `sha256:${digest}`
-    //   size = length
-    // }
+    const digestedCb = (digest, length) => {
+      diff_id = `sha256:${digest}`
+      size = length
+    }
 
-    // const digester = digestStream("sha256", "hex", digestedCb)
+    const digester = digestStream("sha256", "hex", digestedCb)
 
-    // layerStream
-    //   .pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-    //   .pipe(digester) // compute hash and forward
-    //   .pipe(extract) // extract from the tar
+    // const layerStreamGunzipped = layerStream.pipe(zlib.createGunzip())
 
-    // // on extract, move to the right folder and pack into the output tarball
-    // extract.on("entry", function (header, stream, callback) {
+    const layerStreamGunzipped = layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
+    layerStreamGunzipped
+      .pipe(digester) // compute hash and forward
+      .pipe(tarStreamExtract) // extract from the tar
+
+    const comparedCompressed = {compressedSize, layer, cache_id}
+    const digested = {diff_id, size}
+    const compared = {compressedSize, size}
+    const comparedDigested = {diff_id, layer}
+    const headers = layerStreamGunzipped.headers
+    const test1 = layerStreamGunzipped
+    const test2 = test1.headers
+
+    // tarStreamExtract.on('data', function (header, stream, callback) {
     //   // moving to the right folder in tarball
+    //   console.log(header, stream, callback, '==> header, stream, callback')
     //   header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
     //   // write to the tar
     //   stream.pipe(pack.entry(header, callback))
     // })
+    // on extract, move to the right folder and pack into the output tarball
+    tarStreamExtract.on("entry", function (header, stream, callback) {
+      // moving to the right folder in tarball
+      console.log(header, stream, callback, '==> header, stream, callback')
+      header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
+      // write to the tar
+      stream.pipe(pack.entry(header, callback))
+    })
 
-    // extract.on("finish", function () {
-    //   // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-    //   resolve({ diff_id, size })
-    // })
+    tarStreamExtract.on("finish", function () {
+      const diffed = { diff_id, size }
+      // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
+      resolve(diffed)
+    })
 
-    // extract.on("error", function (error) {
-    //   reject(error)
-    // })
-  // })
+    tarStreamExtract.on("error", function (error) {
+      reject(error)
+    })
+  })
 
 
 /**
@@ -152,82 +161,45 @@ const computeChainId = ({ previousChainId, diff_id }) => crypto.createHash("sha2
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
-  const extract = tar.extract()
+// async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
+//   const extract = tar.extract()
 
-  // will hold diff_id value once the hash is done
-  let diff_id = null
-  let size = -1
+//   // will hold diff_id value once the hash is done
+//   let diff_id = null
+//   let size = -1
 
-    const digestedCb = (digest, length) => {
-      diff_id = `sha256:${digest}`
-      size = length
-    }
+//     const digestedCb = (digest, length) => {
+//       diff_id = `sha256:${digest}`
+//       size = length
+//     }
 
-    const digester = digestStream("sha256", "hex", digestedCb)
+//     const digester = digestStream("sha256", "hex", digestedCb)
 
-    layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-                .pipe(digester) // compute hash and forward
-                .pipe(extract) // extract from the tar
-    const test1 = {compressedSize, layer}
-    // on extract, move to the right folder and pack into the output tarball
-    extract.on("entry", function (header, stream, callback) {
-      // moving to the right folder in tarball
-      header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-      // write to the tar
-      const test2 = {compressedSize, layer}
-      stream.pipe(pack.entry(header, callback))
-    })
+//     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
+//                 .pipe(digester) // compute hash and forward
+//                 .pipe(extract) // extract from the tar
+//     const test1 = {compressedSize, layer}
+//     // on extract, move to the right folder and pack into the output tarball
+//     extract.on("entry", function (header, stream, callback) {
+//       // moving to the right folder in tarball
+//       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
+//       // write to the tar
+//       const test2 = {compressedSize, layer}
+//       stream.pipe(pack.entry(header, callback))
+//     })
 
-    extract.on("finish", function () {
-      const diffed = { diff_id, size }
-      // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-      return (diffed)
-    })
+//     extract.on("finish", function () {
+//       const diffed = { diff_id, size }
+//       // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
+//       return (diffed)
+//     })
 
-    extract.on("error", function (error) {
-      return (error)
-    })
-    const diffed = { diff_id, size }
-    return await diffed;
-}
-
-new Promise((resolve, reject) => {
-  const extract = tar.extract()
-
-  // will hold diff_id value once the hash is done
-  let diff_id = null
-  let size = -1
-
-  // const digestedCb = (digest, length) => {
-  //   diff_id = `sha256:${digest}`
-  //   size = length
-  // }
-
-  // const digester = digestStream("sha256", "hex", digestedCb)
-
-  // layerStream
-  //   .pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-  //   .pipe(digester) // compute hash and forward
-  //   .pipe(extract) // extract from the tar
-
-  // // on extract, move to the right folder and pack into the output tarball
-  // extract.on("entry", function (header, stream, callback) {
-  //   // moving to the right folder in tarball
-  //   header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-  //   // write to the tar
-  //   stream.pipe(pack.entry(header, callback))
-  // })
-
-  // extract.on("finish", function () {
-  //   // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-  //   resolve({ diff_id, size })
-  // })
-
-  // extract.on("error", function (error) {
-  //   reject(error)
-  // })
-})
+//     extract.on("error", function (error) {
+//       return (error)
+//     })
+//     const diffed = { diff_id, size }
+//     return await diffed;
+// }
 
 /**
  * Promise : packEntry
@@ -316,16 +288,13 @@ async function downloadProcessLayers(manifests, layers) {
     const cache_id = crypto.randomBytes(32).toString("hex")
     // processing the stream
     try {
-      // start streaming the file //TODO: this is a mock, it should come from a fetch to the registry
-      // const layerStream = fs.createReadStream(path.join(__dirname, "in", "images", image_name.split("/").reverse()[0], layer))
-      
       // TODO figure it tou so the sha256 doesn't have to get added back in because that is just basic ugliness.
-      
-      const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
-      const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-      // const layerStream = fs.createWriteStream(`${baseInPathSub}${layer}`);
-      const layerStream = await getBlob(imageUrl, await token, { digest: `sha256:${layer}`, size: await compressedSize}, baseInPathSub);
-      
+      // const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
+      // const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
+      // const layerBlobsDownloaded = await getBlob(imageUrl, await token, { digest: `sha256:${layer}`, size: await compressedSize}, baseInPathSub);
+
+      // start streaming the file //TODO: this is a mock, it should come from a fetch to the registry
+      const layerStream = await fs.createReadStream(path.join(__dirname, "in", "images", image_name.split("/").reverse()[0], `${layer}.tar.gzip`))
       const diffs = await layerStreamProcessing(await layerStream, pack, cache_id, compressedSize, layer)
       // TODO I LEFT OFF HERE TODAY ROSE ^^
       // layerStream is not piping to the tarball, its giving an error of layerStream.pipe is not a function
