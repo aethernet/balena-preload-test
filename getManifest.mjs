@@ -72,9 +72,10 @@ export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
       "Accept-Encoding": "gzip",
-      "responseType": 'blob',
+      // "responseType": 'blob',
+      "responseType": 'stream',
       "Docker-Distribution-API-Version": 'registry/2.0',
-      "content-transfer-encoding": "binary",
+      // "content-transfer-encoding": "binary",
     },
   }
   try {
