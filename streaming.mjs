@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import gunzip from "gunzip-maybe"
 import zlib from 'zlib';
+
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import dockerParseImage from 'docker-parse-image';
@@ -96,62 +97,60 @@ const computeChainId = ({ previousChainId, diff_id }) => crypto.createHash("sha2
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, layer) =>
-  new Promise((resolve, reject) => {
-    const tarStreamExtract = tar.extract()
+// const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, layer) =>
+//   new Promise((resolve, reject) => {
+//     const tarStreamExtract = tar.extract()
+  
+//     // will hold diff_id value once the hash is done
+//     let diff_id = null
+//     let size = -1
 
-    // will hold diff_id value once the hash is done
-    let diff_id = null
-    let size = -1
+//     function listenerFn(resultDigest, length) {
+//       diff_id = `sha256:${resultDigest}`
+//       size = length
+//     }
 
-    const digestedCb = (digest, length) => {
-      diff_id = `sha256:${digest}`
-      size = length
-    }
+//     const digester = digestStream("sha256", "hex", listenerFn)
 
-    const digester = digestStream("sha256", "hex", digestedCb)
+//     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
+//            .pipe(digester) // compute hash and forward
+//            .pipe(tarStreamExtract) // extract from the tar
 
-    // const layerStreamGunzipped = layerStream.pipe(zlib.createGunzip())
+//     tarStreamExtract.on("entry", function (header, stream, callback) {
+//       // moving to the right folder in tarball
+//       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
+//       // write to the tar
+//       const headerTest = header;
+//       // const headerPipe = pack.entry(header, callback)
+//       // const callBackName = callback;
+//       // stream.pipe(headerPipe)
+//     })
 
-    const layerStreamGunzipped = layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-    layerStreamGunzipped
-      .pipe(digester) // compute hash and forward
-      .pipe(tarStreamExtract) // extract from the tar
 
-    const comparedCompressed = {compressedSize, layer, cache_id}
-    const digested = {diff_id, size}
-    const compared = {compressedSize, size}
-    const comparedDigested = {diff_id, layer}
-    const headers = layerStreamGunzipped.headers
-    const test1 = layerStreamGunzipped
-    const test2 = test1.headers
+//     tarStreamExtract.on("finish", function () {
+//       const diffed = { diff_id, size }
+//       // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
+//       resolve(diffed)
+//     })
 
-    // tarStreamExtract.on('data', function (header, stream, callback) {
-    //   // moving to the right folder in tarball
-    //   console.log(header, stream, callback, '==> header, stream, callback')
-    //   header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-    //   // write to the tar
-    //   stream.pipe(pack.entry(header, callback))
-    // })
-    // on extract, move to the right folder and pack into the output tarball
-    tarStreamExtract.on("entry", function (header, stream, callback) {
-      // moving to the right folder in tarball
-      console.log(header, stream, callback, '==> header, stream, callback')
-      header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-      // write to the tar
-      stream.pipe(pack.entry(header, callback))
-    })
+//     tarStreamExtract.on("error", function (error) {
+//       const err = error;
+//       console.log(error, 'error')
+//       /**
+//       'Error: Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?\n    
+//       at exports.decode (test/node_modules/tar-stream/headers.js:262:43)\n 
+//       at Extract.onheader (test/node_modules/tar-stream/extract.js:123:39)\n    
+//       at Extract._write (test/node_modules/tar-stream/extract.js:24…e_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:398:5)\n    
+//       at Writable.write (test/node_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:307:11)\n    
+//       at PassThroughExt.ondata (node:internal/streams/readable:766:22)\n    
+//       at PassThroughExt.emit (node:events:537:28)\n    
+//       at addChunk (node:internal/streams/readable:324:12)\n    
+//       at readableAddChunk (node:internal/streams/readable:297:9)'
+//        */
 
-    tarStreamExtract.on("finish", function () {
-      const diffed = { diff_id, size }
-      // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-      resolve(diffed)
-    })
-
-    tarStreamExtract.on("error", function (error) {
-      reject(error)
-    })
-  })
+//       reject(error)
+//     })
+//   })
 
 
 /**
@@ -161,45 +160,38 @@ const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, laye
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-// async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
-//   const extract = tar.extract()
+async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
+  // const layerStream2 = layerStream.toBuffer();
+  // const gunzip = zlib.createGunzip();
+  const extract = tar.extract();
+  return new Promise((resolve) => {
+    let diff_id = null
+    let size = -1
+    const listenerFn = (resultDigest, length) => {
+      diff_id = `sha256:${resultDigest}`
+      size = length
+    }
+    const digester = digestStream("sha256", "hex", listenerFn)
 
-//   // will hold diff_id value once the hash is done
-//   let diff_id = null
-//   let size = -1
-
-//     const digestedCb = (digest, length) => {
-//       diff_id = `sha256:${digest}`
-//       size = length
-//     }
-
-//     const digester = digestStream("sha256", "hex", digestedCb)
-
-//     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-//                 .pipe(digester) // compute hash and forward
-//                 .pipe(extract) // extract from the tar
-//     const test1 = {compressedSize, layer}
-//     // on extract, move to the right folder and pack into the output tarball
-//     extract.on("entry", function (header, stream, callback) {
-//       // moving to the right folder in tarball
-//       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-//       // write to the tar
-//       const test2 = {compressedSize, layer}
-//       stream.pipe(pack.entry(header, callback))
-//     })
-
-//     extract.on("finish", function () {
-//       const diffed = { diff_id, size }
-//       // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-//       return (diffed)
-//     })
-
-//     extract.on("error", function (error) {
-//       return (error)
-//     })
-//     const diffed = { diff_id, size }
-//     return await diffed;
-// }
+    extract.on('entry', (header, stream, cb) => {
+      header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
+      const headerPipe = pack.entry(header, cb)
+      stream.pipe(headerPipe)
+      // stream.on('end', () => {
+      //   cb();
+      // });
+      // stream.resume();
+    });
+    extract.on('finish', () => {
+      const diffed = { diff_id, size }
+      resolve(diffed);
+    });
+    layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
+        .pipe(digester) // compute hash and forward
+        .pipe(extract) // extract from the tar
+    // gunzip.pipe(digester).pipe(extract).end(layerStream);
+  });
+}
 
 /**
  * Promise : packEntry
@@ -288,21 +280,18 @@ async function downloadProcessLayers(manifests, layers) {
     const cache_id = crypto.randomBytes(32).toString("hex")
     // processing the stream
     try {
-      // TODO figure it tou so the sha256 doesn't have to get added back in because that is just basic ugliness.
-      // const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
-      // const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-      // const layerBlobsDownloaded = await getBlob(imageUrl, await token, { digest: `sha256:${layer}`, size: await compressedSize}, baseInPathSub);
+      const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
+      const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
+      const layerStream = await getBlob(imageUrl, await token, { digest: `sha256:${layer}`, size: await compressedSize}, baseInPathSub);
 
-      // start streaming the file //TODO: this is a mock, it should come from a fetch to the registry
-      const layerStream = await fs.createReadStream(path.join(__dirname, "in", "images", image_name.split("/").reverse()[0], `${layer}.tar.gzip`))
       const diffs = await layerStreamProcessing(await layerStream, pack, cache_id, compressedSize, layer)
       // TODO I LEFT OFF HERE TODAY ROSE ^^
-      // layerStream is not piping to the tarball, its giving an error of layerStream.pipe is not a function
+      // layerStreamProcessing may have to be within getBlob
 
 
       // // find all layers related to this archive
       const relatedLayers = layers.filter((layer) => layer.diff_id === diffs.diff_id);
-            
+      const layersLength = relatedLayers.length;
       // for (const { chain_id, diff_id, parent, lower, link } of relatedLayers) {
       //   // create all other files and folders required for this layer
       //   const dockerOverlay2CacheId = path.join("docker", "overlay2", cache_id)
