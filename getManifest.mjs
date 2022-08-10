@@ -1,6 +1,6 @@
 import axios from 'axios';
 import dockerParseImage from 'docker-parse-image';
-import { fs } from 'zx';
+// import { fs } from 'zx';
 import { inspect } from 'util';
 import { getAuthHeaders } from './getAuth.mjs';
 const featureFlags = {
@@ -59,7 +59,8 @@ function getRegistryUrl({ registry, namespace }) {
 // NOTE the double namespace here, the 1st v2 is for docker Version2, the second is for image release Version2
 // Not sure how to get the image rel
 function getImageUrl({ registry, namespace, repository }) {
-  return `https://${registry}/${namespace}/${namespace}/${repository}`; 
+  // we're only supporting docker api v2 for now
+  return `https://${registry}/v2/${namespace}/${repository}`; 
 }
 
 /** getAllBlobs
@@ -68,32 +69,22 @@ function getImageUrl({ registry, namespace, repository }) {
 export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
   const options = {
     "method": "GET",
+    "responseType": 'stream',
     "headers": {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.docker.image.rootfs.diff.tar.gzip",
       "Accept-Encoding": "gzip",
       // "responseType": 'blob',
-      "responseType": 'stream',
       "Docker-Distribution-API-Version": 'registry/2.0',
       // "content-transfer-encoding": "binary",
     },
+    "url": `${imageUrl}/blobs/${layer.digest}`
   }
   try {
-    options.url = `${imageUrl}/blobs/${layer.digest}`;
-    const { data, headers } = await axios(options)
-    if ((parseInt(headers['content-length']) === layer.size) 
-      && (headers['docker-content-digest'] === layer.digest)) {
-        const downloaded = { headers, layer, success: true }
-        const typeOfBlob = headers['content-type'];
-        console.log('\n\n==> getting Blob: typeOfBlob', inspect(downloaded, true, 2, true), typeOfBlob);
-        return await data;
-    } else {
-      const failed = { layer, headers, error: 'failed'}
-      console.error('\n\n==> getBlob failed:', inspect(failed, true, 2, true))
-      return failed;
-    }
+    const response = await axios(options)
+    return response.data
   } catch(error) {
-    console.error('\n\n==> getAllBlob error:', inspect(error, true, 2, true))
+    console.error('\n\n==> getBlob error:', inspect(error, true, 2, true))
   }
 }
 
@@ -114,7 +105,7 @@ export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
 async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
   try {
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-      const writeToFile = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}.tar.gzip`);
+      // const writeToFile = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}.tar.gzip`);
       const dataBlob = await getBlob(imageUrl, token, layer, baseInPath)
       writeToFile.write(await dataBlob);
       writeToFile.end();
@@ -143,7 +134,7 @@ async function getConfigManifest(imageUrl, token, digest, baseInPath) {
   }
   try {
     const { data } = await axios(options);
-    fs.writeFileSync(`${baseInPath}/${digest.split(':')[1]}`, JSON.stringify(await data, null, 2));
+    // fs.writeFileSync(`${baseInPath}/${digest.split(':')[1]}`, JSON.stringify(await data, null, 2));
     return await data;
   } catch (error) {
     console.error('==> getBlob error', error)
@@ -167,11 +158,9 @@ async function getHeadBlob(imageUrl, token, digest) {
   }
   try {
     const { data, headers } = await axios(options);
-    if (headers['content-length'] && headers['docker-content-digest'] === digest) {
-      return headers['content-length'];
-    }
-    console.error(digest, '==> getHeadBlob failed to get configDigest\n\n')
-    return 0;
+    
+    // Not possible to check `headers['docker-content-digest'] === digest` since cloudfront frontend doesn't forward dockers headers
+      return headers['content-length'] ?? 0;
   } catch (error) {
     throw new Error('==> getHeadBlob CATCH:', error);
   }
@@ -193,7 +182,7 @@ async function getManifest(imageUrl, token, authHeaders,baseInPath) {
   try {
     const { data, headers } = await axios(options);
     const digest = headers["docker-content-digest"];
-    fs.writeFileSync(`${baseInPath}/manifest.json`, JSON.stringify(await data, null, 2));
+    // fs.writeFileSync(`${baseInPath}/manifest.json`, JSON.stringify(await data, null, 2));
     return { ...data, digest };
   } catch (error) {
     throw new Error('==> NOPE did not get registry manifest. CATCH:', error);
@@ -257,20 +246,20 @@ export const getUrls = async (image, layer) => {
   return { registryUrl, imageUrl, parsedImage };
 }
 
-const makeDirectory = async (directory) => {
-  if (!fs.existsSync(directory)){
-    fs.mkdirSync(directory, 
-      { recursive: true, mode: '0777' }
-    );
-  }
-};
+// const makeDirectory = async (directory) => {
+//   if (!fs.existsSync(directory)){
+//     fs.mkdirSync(directory, 
+//       { recursive: true, mode: '0777' }
+//     );
+//   }
+// };
 
 export const pullManifestsFromRegistry = async (image, auth, baseInPath) => {
   const authHeaders = auth || await getAuthHeaders(auth);
   const { registryUrl, imageUrl, parsedImage } = await getUrls(image);
 
   const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-  await makeDirectory(baseInPathSub);
+  // await makeDirectory(baseInPathSub);
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
 
@@ -290,7 +279,10 @@ export const pullManifestsFromRegistry = async (image, auth, baseInPath) => {
     const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest, baseInPathSub);
   }
 
-  return { manifest, digests, configDigest, configManifestV2, diff_ids, imageUrl, token };
+  const image_id = configDigest
+  const image_name = image
+
+  return { manifest, digests, configDigest, configManifestV2, image_id, image_name, diff_ids, imageUrl, token };
 }
 
 
