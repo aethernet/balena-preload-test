@@ -407,4 +407,4 @@ const processPreloading = async () => {
   pack.finalize()
 }
 const preloaded = await processPreloading()
-console.log(preloaded, '==> preloaded')
+console.log(`=== Your tarball is ready in the out folder === `)
