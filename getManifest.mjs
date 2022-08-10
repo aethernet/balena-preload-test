@@ -1,6 +1,5 @@
 import axios from 'axios';
 import dockerParseImage from 'docker-parse-image';
-// import { fs } from 'zx';
 import { inspect } from 'util';
 import { getAuthHeaders } from './getAuth.mjs';
 const featureFlags = {
@@ -105,7 +104,6 @@ export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
 async function getAllBlobs(imageUrl, token, manifest, baseInPath) {
   try {
     const tgzLayersDigest = await Promise.all(manifest.layers.map(async (layer) => {
-      // const writeToFile = fs.createWriteStream(`${baseInPath}/${layer.digest.split(':')[1]}.tar.gzip`);
       const dataBlob = await getBlob(imageUrl, token, layer, baseInPath)
       writeToFile.write(await dataBlob);
       writeToFile.end();
@@ -134,11 +132,9 @@ async function getConfigManifest(imageUrl, token, digest, baseInPath) {
   }
   try {
     const { data } = await axios(options);
-    // fs.writeFileSync(`${baseInPath}/${digest.split(':')[1]}`, JSON.stringify(await data, null, 2));
     return await data;
   } catch (error) {
     console.error('==> getBlob error', error)
-    // throw new Error(`\n\n==> getBlob => ERROR: ${error}`);
   }
 }
 
@@ -160,7 +156,7 @@ async function getHeadBlob(imageUrl, token, digest) {
     const { data, headers } = await axios(options);
     
     // Not possible to check `headers['docker-content-digest'] === digest` since cloudfront frontend doesn't forward dockers headers
-      return headers['content-length'] ?? 0;
+    return headers['content-length'] ?? 0;
   } catch (error) {
     throw new Error('==> getHeadBlob CATCH:', error);
   }
@@ -182,7 +178,6 @@ async function getManifest(imageUrl, token, authHeaders,baseInPath) {
   try {
     const { data, headers } = await axios(options);
     const digest = headers["docker-content-digest"];
-    // fs.writeFileSync(`${baseInPath}/manifest.json`, JSON.stringify(await data, null, 2));
     return { ...data, digest };
   } catch (error) {
     throw new Error('==> NOPE did not get registry manifest. CATCH:', error);
@@ -246,20 +241,11 @@ export const getUrls = async (image, layer) => {
   return { registryUrl, imageUrl, parsedImage };
 }
 
-// const makeDirectory = async (directory) => {
-//   if (!fs.existsSync(directory)){
-//     fs.mkdirSync(directory, 
-//       { recursive: true, mode: '0777' }
-//     );
-//   }
-// };
-
 export const pullManifestsFromRegistry = async (image, auth, baseInPath) => {
   const authHeaders = auth || await getAuthHeaders(auth);
   const { registryUrl, imageUrl, parsedImage } = await getUrls(image);
 
   const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-  // await makeDirectory(baseInPathSub);
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders);
 

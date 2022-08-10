@@ -1,10 +1,8 @@
 import crypto from "crypto"
 import gunzip from "gunzip-maybe"
-import zlib from 'zlib';
 
 import tar from "tar-stream"
 import digestStream from "digest-stream"
-import dockerParseImage from 'docker-parse-image';
 import path from "path"
 import { getAuthHeaders } from "./getAuth.mjs"
 import { pullManifestsFromRegistry, getUrls, getBlob } from "./getManifest.mjs"
