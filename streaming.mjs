@@ -17,9 +17,13 @@ const __dirname = path.dirname(__filename)
 const baseInPath = path.join(__dirname, "in")
 
 // variables
-const app_id = "ee6c3b3f75ae456d9760171a27a36568" //"7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a" ee6c3b3f75ae456d9760171a27a36568
-const release_id = "7e27e701c0e15a34c85881f0e1e53896" //"302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
-const balenaosRef = "expanded-aarch64.img.zip"
+const app_id = "7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a" ee6c3b3f75ae456d9760171a27a36568
+const release_id = "302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
+const balenaosRef = "expanded-aarch64"
+const user = "edwin3"
+const password = process.env.PASSWD
+
+if (!password) throw new error("Password is missing, launch this with `PASSWD=****** node streaming.mjs`")
 
 /** 
  * Get repositories.json for a balenaos version
@@ -28,7 +32,7 @@ const balenaosRef = "expanded-aarch64.img.zip"
  * @return {json} repositories.json
  */
 const getRepositoriesJsonFor = async (baleneosVersion) => {
-  return await fs.readJson(path.join(__dirname, "in", `baleneosVersion.repositories.json`))
+  return await fs.readJson(path.join(__dirname, "in", `${baleneosVersion}.repositories.json`))
 }
 
 /**
@@ -66,8 +70,10 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
  */
 const getManifests = async (images, auth) => {
   const manifestsAll = [];
-  for await (const { image_name, image_hash } of images) {
-    console.log(image_name, image_hash, '==> image_name, image_hash')
+  console.log(`== Downloading Manifests ==`)
+  for (const key in images) {
+    const { image_name, image_hash } = images[key]
+    console.log(`=> ${parseInt(key) + 1} / ${images.length} : ${image_name}`)
     const manifestInfo = await pullManifestsFromRegistry(image_name, auth, baseInPath)
     manifestsAll.push({
       ...manifestInfo,
@@ -75,7 +81,7 @@ const getManifests = async (images, auth) => {
       image_hash,
     })
   }
-  return await manifestsAll;
+  return manifestsAll;
 }
 
 
@@ -194,16 +200,17 @@ async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize
 }
 
 /**
- * Promise : packEntry
+ * PromisePacker
  * Promisify tar-stream.pack.entry ( https://www.npmjs.com/package/tar-stream )
  * @param {object} header - tar-stream.pack.entry header
  * @param {string} value - tar-stream.pack.entry value
  * @returns {Promise}
  * */
-const packEntry = (header, value, callback) =>
+const promisePacker = (pack) => (header, value, cb) =>
   new Promise((resolve, reject) => {
     pack.entry(header, value, (error) => {
       if (error) reject(error)
+      if(cb) cb()
       resolve(true)
     })
   })
@@ -257,22 +264,28 @@ async function getLayers(manifests) {
     .flat();
 }
 
-// 8. download and process layers
-async function downloadProcessLayers(manifests, layers) {
-  // // setup tar-stream
+// setup tar-stream
+const prepareTarball = () => {
   const pack = tar.pack()
   const tarball = fs.createWriteStream(path.join(__dirname, "out", "tarball.tar"))
   pack.pipe(tarball) //TODO: output to a file, should eventually be a http response
+  return pack
+}
 
+// 8. download and process layers
+const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
 
-  // TODO, this is problemantic, its not deduping... 
-  const processingLayers = await manifests
+  // TODO, this is problematic, its not deduping layers which comes from the SV (host apps)
+  const processingLayers = manifests
     .map(({ manifest, image_name, token }) => manifest.layers.map((layer) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] })))
     .flat()
     .filter((layer, index, layers) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
-  console.log(`Downloading ${processingLayers.length} layers`, processingLayers);
-  for await (const { layer, image_name, compressedSize, token } of processingLayers) {
-    // we generate random chain_id for the layer here (instead of when pre-computing layer infos)
+  
+  console.log(`== Processing Layers ==`)
+  for (const key in processingLayers) {
+    const { layer, image_name, compressedSize, token } = processingLayers[key]
+    console.log(`=> ${parseInt(key) + 1} / ${processingLayers.length} : sha256:${layer}`)
+    // we generate random chain_id for the layer here (instead of doig so when pre-computing layer infos)
     // like this we can stream the layer diff folder prior to knowing it's diff_id
     // to get the diff_id we need to hash (sha256) the layer `tarball`, which we cannot do before gettin the whole layer
     // so we'll start streaming, and compute the `sha256` at the same time, once the whole layer is downloaded we'll
@@ -282,85 +295,90 @@ async function downloadProcessLayers(manifests, layers) {
     try {
       const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
       const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-      const layerStream = await getBlob(imageUrl, await token, { digest: `sha256:${layer}`, size: await compressedSize}, baseInPathSub);
+      const layerStream = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize}, baseInPathSub);
 
-      const diffs = await layerStreamProcessing(await layerStream, pack, cache_id, compressedSize, layer)
-      // TODO I LEFT OFF HERE TODAY ROSE ^^
-      // layerStreamProcessing may have to be within getBlob
-
+      const {size, diff_id} = await layerStreamProcessing(await layerStream, pack, cache_id, compressedSize, layer)
 
       // // find all layers related to this archive
-      const relatedLayers = layers.filter((layer) => layer.diff_id === diffs.diff_id);
-      const layersLength = relatedLayers.length;
-      // for (const { chain_id, diff_id, parent, lower, link } of relatedLayers) {
-      //   // create all other files and folders required for this layer
-      //   const dockerOverlay2CacheId = path.join("docker", "overlay2", cache_id)
-      //   const dockerOverlay2l = path.join("docker", "overlay2", "l")
-      //   const dockerImageOverlay2LayerdbSha256ChainId = path.join("docker", "image", "overlay2", "layerdb", "sha256", chain_id)
+      const relatedLayers = layers.filter((layer) => layer.diff_id === diff_id);
 
-      //   // symlink from `l/_link_` to `../_cache_id_/diff`
-      //   await packEntry({
-      //     name: path.join(dockerOverlay2l, link),
-      //     type: "symlink",
-      //     linkname: path.join("..", cache_id, "diff"),
-      //   })
+      for (const { chain_id, diff_id, parent, lower, link } of relatedLayers) {
+        // create all other files and folders required for this layer
+        const dockerOverlay2CacheId = path.join("docker", "overlay2", cache_id)
+        const dockerOverlay2l = path.join("docker", "overlay2", "l")
+        const dockerImageOverlay2LayerdbSha256ChainId = path.join("docker", "image", "overlay2", "layerdb", "sha256", chain_id)
 
-      //   await packEntry({ name: path.join(dockerOverlay2CacheId, "commited"), mode: "0o600" }, "") // empty file
-      //   await packEntry({ name: path.join(dockerOverlay2CacheId, "work"), mode: "0o777", type: "directory" }) // empty directory
-      //   await packEntry({ name: path.join(dockerOverlay2CacheId, "link"), mode: "0o644" }, link)
-      //   await packEntry({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "diff"), mode: "0o755" }, diff_id)
-      //   await packEntry({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "cache-id"), mode: "0o755" }, cache_id)
-      //   await packEntry({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "size"), mode: "0o755" }, String(size))
-      //   if (parent) await packEntry({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "parent"), mode: "0o755" }, parent) // first layer doens't have any parent
-      //   if (lower) await packEntry({ name: path.join(dockerOverlay2CacheId, "lower"), mode: "0o644" }, lower) // lowest layer has no lower
-      // }
+        // symlink from `l/_link_` to `../_cache_id_/diff`
+        await packFile({
+          name: path.join(dockerOverlay2l, link),
+          type: "symlink",
+          linkname: path.join("..", cache_id, "diff"),
+        })
+
+        await packFile({ name: path.join(dockerOverlay2CacheId, "commited"), mode: "0o600" }, "") // empty file
+        await packFile({ name: path.join(dockerOverlay2CacheId, "work"), mode: "0o777", type: "directory" }) // empty directory
+        await packFile({ name: path.join(dockerOverlay2CacheId, "link"), mode: "0o644" }, link)
+        await packFile({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "diff"), mode: "0o755" }, diff_id)
+        await packFile({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "cache-id"), mode: "0o755" }, cache_id)
+        await packFile({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "size"), mode: "0o755" }, String(size))
+        if (parent) await packFile({ name: path.join(dockerImageOverlay2LayerdbSha256ChainId, "parent"), mode: "0o755" }, parent) // first layer doens't have any parent
+        if (lower) await packFile({ name: path.join(dockerOverlay2CacheId, "lower"), mode: "0o644" }, lower) // lowest layer has no lower
+      }
     } catch (error) {
       console.error('downloadProcessLayers CATCH', error);
     }
   }
 }
 
-// // 9. Add the `images` related files
-// const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
-// const repositories = []
-// for (const { manifest, image_id, image_name, image_hash } of imageManifests) {
-//   console.log("add image =>", image_id, image_name)
+// 9. Add the `images` related files
+const packImageFiles = async (manifests, packFile) => {
+  const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
 
-//   await packEntry({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), mode: "0o644" }, JSON.stringify(manifest))
-//   await packEntry(
-//     { name: path.join(dockerImageOverlay2Imagedb, "metadata", "sha256", image_id, "lastUpdated"), mode: "0o644" },
-//     new Date().toISOString()
-//   )
+  console.log("== Add Images Files ==")
+  for (const key in manifests) {
+    const { configManifestV2, image_id, image_name } = manifests[key]
+    console.log(`=> ${parseInt(key) + 1} : ${image_name}`)
 
-//   // prepare repositories
-//   repositories[image_name] = {
-//     [`${image_name}:latest`]: `sha256:${image_id}`,
-//     [`${image_name}:@${image_hash}`]: `sha256:${image_id}`,
-//   }
-// }
+    await packFile({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), mode: "0o644" }, JSON.stringify(configManifestV2))
+    await packFile(
+      { name: path.join(dockerImageOverlay2Imagedb, "metadata", "sha256", image_id, "lastUpdated"), mode: "0o644" },
+      new Date().toISOString()
+    )
+  }
+}
 
-// // 10. merge repositories.json
-// // TODO: this should be done by downloading the `repositories.json` linked to the balenaos image we're going to stream
-// // Those files shouls be placed in s3 along the expanded .img so we don't need to extract it each time we serve an image
-// // In the meantime I'll take one from the `in` folder
-// const repositoriesJson = getRepositoriesJsonFor(balenaosRef)
-// for (const repository of repositories) {
-//   repositoriesJson[repository] = {...repository}
-// }
+// 10. merge repositories.json
+// TODO: this should be done by downloading the `repositories.json` linked to the balenaos image we're going to stream
+// Those files shouls be placed in s3 along the expanded .img so we don't need to extract it each time we serve an image
+// In the meantime I'll take one from the `in` folder
+const mergeRepositories = async (manifests, packFile) => {
+  const repositories = []
+  for (const { image_id, image_name, image_hash } of manifests) {
+    // prepare repositories
+    repositories[image_name] = {
+      [`${image_name}:latest`]: `sha256:${image_id}`,
+      [`${image_name}:@${image_hash}`]: `sha256:${image_id}`,
+    }
+  }
+  
+  const repositoriesJson = getRepositoriesJsonFor(balenaosRef)
+  for (const repository of repositories) {
+    repositoriesJson[repository] = {...repository}
+  }
 
-// await packEntry({name: path.join("docker", "image", "overlay2"), mode: "0o644" }, JSON.stringify(repositoriesJson))
+  await packFile({name: path.join("docker", "image", "overlay2"), mode: "0o644" }, JSON.stringify(repositoriesJson))
+}
 
-// // 11. Close the tarball
-// pack.finalize()
-
-
-async function processPreloading() {
+const processPreloading = async () => {
   // ##############
   // Processing
   // ##############
 
   // 0. Get authHeaders
-  const authHeaders = await getAuthHeaders()
+  const authHeaders = await getAuthHeaders({
+    user,
+    password
+  })
 
   // 1. get apps.json
   const appsJson = await getAppsJson({ app_id, release_id })
@@ -372,10 +390,21 @@ async function processPreloading() {
   const manifests = await getManifests(images, authHeaders)
 
   // 5. create a `layers` array of object to keep track of what we're doing
-  const layers = await getLayers(await manifests);
+  const layers = await getLayers(manifests)
+
+  // prepare tarball packer
+  const pack = prepareTarball() // this one is streamable
+  const packFile = promisePacker(pack) // this one is a promise
 
   // 8. download and process layers
-  downloadProcessLayers(await manifests, await layers);
+  await downloadProcessLayers(manifests, layers, pack, packFile)
+
+  await packImageFiles(manifests, packFile)
+
+  await mergeRepositories(manifests, packFile)
+
+  // close tarball
+  pack.finalize()
 }
-const preloaded = await processPreloading();
-console.log(preloaded, '==> preloaded');
+const preloaded = await processPreloading()
+console.log(preloaded, '==> preloaded')
