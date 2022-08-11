@@ -6,22 +6,41 @@ import digestStream from "digest-stream"
 import path from "path"
 import { getAuthHeaders } from "./getAuth.mjs"
 import { pullManifestsFromRegistry, getUrls, getBlob } from "./getManifest.mjs"
-
+import { inspect } from "util"
 // FIXME: Those import are uses for mocks, should eventually be removed
 import fs from "fs-extra"
 import { fileURLToPath } from "url"
+import logger from "./logger.mjs"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const baseInPath = path.join(__dirname, "in")
 
 // variables
-const app_id = "7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a" ee6c3b3f75ae456d9760171a27a36568
-const release_id = "302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
-const balenaosRef = "expanded-aarch64"
-const user = "edwin3"
-const password = process.env.PASSWD
+const getEnvs = (user) => {
+  const authHeaders = getAuthHeaders(user)
+  const envs = {
+    edwin2: {
+      app_id: "ed91bdb088b54a3b999576679281520a", //ee6c3b3f75ae456d9760171a27a36568
+      release_id: "302261f9d08a388e36deccedac6cb424", // "2f24cd2be3006b029911a3d0da6837d5" 
+      balenaosRef: "expanded-aarch64",
+      user: "edwin3",
+      password: process.env.PASSWD,
+    },
+    bob: {
+      app_id: "ee6c3b3f75ae456d9760171a27a36568",
+      release_id: "63908fb619fceb7bc30de7d93c207af2",
+      balenaosRef: "expanded-aarch64",
+      user: "bob" || authHeaders.auth.username,
+      password: process.env.PASSWD || authHeaders.auth.password,
+    }
+  }[user];
+  logger.warn(inspect(envs),'==> envs');
+  if (!envs.password) throw new error("Password is missing, launch this with `PASSWD=****** node streaming.mjs`")
+  return envs;
+}
+const { app_id, release_id, balenaosRef, user, password } = getEnvs("bob")
 
-if (!password) throw new error("Password is missing, launch this with `PASSWD=****** node streaming.mjs`")
+
 
 /** 
  * Get repositories.json for a balenaos version
@@ -30,7 +49,7 @@ if (!password) throw new error("Password is missing, launch this with `PASSWD=**
  * @return {json} repositories.json
  */
 const getRepositoriesJsonFor = async (baleneosVersion) => {
-  return await fs.readJson(path.join(__dirname, "in", `${baleneosVersion}.repositories.json`))
+  return fs.readJsonSync(path.join(__dirname, "in", `${baleneosVersion}.repositories.json`))
 }
 
 /**
@@ -52,8 +71,12 @@ const getAppsJson = async ({ app_id, release_id }) => {
  * @returns {[]object} - list of {image_name, commit}
  */
 const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
-  const imageKeys = Object.keys(appsJson.apps?.[app_id]?.releases?.[release_id]?.services)
-  const imageNames = imageKeys.map((key) => appsJson.apps?.[app_id]?.releases?.[release_id]?.services[key].image)
+  const appId = Object.keys(appsJson.apps) || app_id;
+  logger.warn(`==> appId: ${appId}`)
+  const releaseId = Object.keys(appsJson.apps?.[appId]?.releases) || release_id;
+  logger.warn(`==> releaseId: ${releaseId}`)
+  const imageKeys = Object.keys(appsJson.apps?.[appId]?.releases?.[releaseId]?.services)
+  const imageNames = imageKeys.map((key) => appsJson.apps?.[appId]?.releases?.[releaseId]?.services[key].image)
   return imageNames.map((image) => {
     const [image_name, image_hash] = image.split("@")
     return { image_name, image_hash }
@@ -68,10 +91,10 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
  */
 const getManifests = async (images, auth) => {
   const manifestsAll = [];
-  console.log(`== Downloading Manifests ==`)
+  logger.warn(`== Downloading Manifests @getManifests ==`)
   for (const key in images) {
     const { image_name, image_hash } = images[key]
-    console.log(`=> ${parseInt(key) + 1} / ${images.length} : ${image_name}`)
+    logger.verbose(`=> ${parseInt(key) + 1} / ${images.length} : ${image_name}`)
     const manifestInfo = await pullManifestsFromRegistry(image_name, auth, baseInPath)
     manifestsAll.push({
       ...manifestInfo,
@@ -101,72 +124,7 @@ const computeChainId = ({ previousChainId, diff_id }) => crypto.createHash("sha2
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-// const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, layer) =>
-//   new Promise((resolve, reject) => {
-//     const tarStreamExtract = tar.extract()
-  
-//     // will hold diff_id value once the hash is done
-//     let diff_id = null
-//     let size = -1
-
-//     function listenerFn(resultDigest, length) {
-//       diff_id = `sha256:${resultDigest}`
-//       size = length
-//     }
-
-//     const digester = digestStream("sha256", "hex", listenerFn)
-
-//     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-//            .pipe(digester) // compute hash and forward
-//            .pipe(tarStreamExtract) // extract from the tar
-
-//     tarStreamExtract.on("entry", function (header, stream, callback) {
-//       // moving to the right folder in tarball
-//       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-//       // write to the tar
-//       const headerTest = header;
-//       // const headerPipe = pack.entry(header, callback)
-//       // const callBackName = callback;
-//       // stream.pipe(headerPipe)
-//     })
-
-
-//     tarStreamExtract.on("finish", function () {
-//       const diffed = { diff_id, size }
-//       // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-//       resolve(diffed)
-//     })
-
-//     tarStreamExtract.on("error", function (error) {
-//       const err = error;
-//       console.log(error, 'error')
-//       /**
-//       'Error: Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?\n    
-//       at exports.decode (test/node_modules/tar-stream/headers.js:262:43)\n 
-//       at Extract.onheader (test/node_modules/tar-stream/extract.js:123:39)\n    
-//       at Extract._write (test/node_modules/tar-stream/extract.js:24…e_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:398:5)\n    
-//       at Writable.write (test/node_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:307:11)\n    
-//       at PassThroughExt.ondata (node:internal/streams/readable:766:22)\n    
-//       at PassThroughExt.emit (node:events:537:28)\n    
-//       at addChunk (node:internal/streams/readable:324:12)\n    
-//       at readableAddChunk (node:internal/streams/readable:297:9)'
-//        */
-
-//       reject(error)
-//     })
-//   })
-
-
-/**
- * Promise : Layer Stream Processing
- * @param {readableStream} layerStream - byte stream of the layer archive (tar+gz)
- * @param {tar.pack} pack - tar pack
- * @param {string} cache_id - generated cache_id
- * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
- */
 async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
-  // const layerStream2 = layerStream.toBuffer();
-  // const gunzip = zlib.createGunzip();
   const extract = tar.extract();
   return new Promise((resolve) => {
     let diff_id = null
@@ -181,10 +139,6 @@ async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize
       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
       const headerPipe = pack.entry(header, cb)
       stream.pipe(headerPipe)
-      // stream.on('end', () => {
-      //   cb();
-      // });
-      // stream.resume();
     });
     extract.on('finish', () => {
       const diffed = { diff_id, size }
@@ -193,7 +147,6 @@ async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize
     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
         .pipe(digester) // compute hash and forward
         .pipe(extract) // extract from the tar
-    // gunzip.pipe(digester).pipe(extract).end(layerStream);
   });
 }
 
@@ -206,6 +159,8 @@ async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize
  * */
 const promisePacker = (pack) => (header, value, cb) =>
   new Promise((resolve, reject) => {
+    logger.debug(`=> pack header.name: ${header.name}`)
+    // logger.debug(`=> pack value: ${inspect(value, true, 5, true)}`)
     pack.entry(header, value, (error) => {
       if (error) reject(error)
       if(cb) cb()
@@ -230,6 +185,7 @@ const promisePacker = (pack) => (header, value, cb) =>
 //  "lower": lower link chain
 // }
 async function getLayers(manifests) {
+  logger.warn(`== getting Layers @getLayers ==`)
   return manifests
     .map(({manifest, image_name, image_id, diff_ids, token }) => {
       // compute and generate values for all the layers from all images, while deduplicating cache and link
@@ -279,10 +235,10 @@ const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
     .flat()
     .filter((layer, index, layers) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
   
-  console.log(`== Processing Layers ==`)
+  logger.warn(`== Processing Layers @downloadProcessLayers ==`)
   for (const key in processingLayers) {
     const { layer, image_name, compressedSize, token } = processingLayers[key]
-    console.log(`=> ${parseInt(key) + 1} / ${processingLayers.length} : sha256:${layer}`)
+    logger.verbose(`=> ${parseInt(key) + 1} / ${processingLayers.length} : sha256:${layer}`)
     // we generate random chain_id for the layer here (instead of doig so when pre-computing layer infos)
     // like this we can stream the layer diff folder prior to knowing it's diff_id
     // to get the diff_id we need to hash (sha256) the layer `tarball`, which we cannot do before gettin the whole layer
@@ -323,7 +279,7 @@ const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
         if (lower) await packFile({ name: path.join(dockerOverlay2CacheId, "lower"), mode: "0o644" }, lower) // lowest layer has no lower
       }
     } catch (error) {
-      console.error('downloadProcessLayers CATCH', error);
+      logger.error('downloadProcessLayers CATCH', error);
     }
   }
 }
@@ -332,16 +288,15 @@ const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
 const packImageFiles = async (manifests, packFile) => {
   const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
 
-  console.log("== Add Images Files ==")
+  logger.verbose("== Add Images Files @packImageFiles ==")
   for (const key in manifests) {
     const { configManifestV2, image_id, image_name } = manifests[key]
-    console.log(`=> ${parseInt(key) + 1} : ${image_name}`)
 
-    await packFile({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), mode: "0o644" }, JSON.stringify(configManifestV2))
-    await packFile(
-      { name: path.join(dockerImageOverlay2Imagedb, "metadata", "sha256", image_id, "lastUpdated"), mode: "0o644" },
-      new Date().toISOString()
-    )
+    await packFile({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id), 
+      mode: "0o644" }, JSON.stringify(configManifestV2))
+
+    await packFile({ name: path.join(dockerImageOverlay2Imagedb, "content", "sha256", image_id),
+      mode: "0o644" }, new Date().toISOString())
   }
 }
 
@@ -350,6 +305,7 @@ const packImageFiles = async (manifests, packFile) => {
 // Those files shouls be placed in s3 along the expanded .img so we don't need to extract it each time we serve an image
 // In the meantime I'll take one from the `in` folder
 const mergeRepositories = async (manifests, packFile) => {
+  logger.warn("== Merge Repositories @mergeRepositories ==")
   const repositories = []
   for (const { image_id, image_name, image_hash } of manifests) {
     // prepare repositories
@@ -358,13 +314,21 @@ const mergeRepositories = async (manifests, packFile) => {
       [`${image_name}:@${image_hash}`]: `sha256:${image_id}`,
     }
   }
+
+  logger.debug('==> @mergeRepositories manifests', inspect(manifests))
+  logger.debug('==> @mergeRepositories repositories',  repositories)
   
-  const repositoriesJson = getRepositoriesJsonFor(balenaosRef)
+  
+  // TODO need repositoriesJson
+  const repositoriesJson = await getRepositoriesJsonFor(balenaosRef)
+  // const repositoriesJson = {}
   for (const repository of repositories) {
     repositoriesJson[repository] = {...repository}
   }
-
-  await packFile({name: path.join("docker", "image", "overlay2"), mode: "0o644" }, JSON.stringify(repositoriesJson))
+  logger.debug(`==> @mergeRepositories repositoriesJson ${inspect(repositoriesJson, true,3,true)}`)
+  const repoPackFileName = path.join("docker", "image", "overlay2")
+  logger.debug(`==> @mergeRepositories repoPackFileName ${repoPackFileName}`)
+  await packFile({name: repoPackFileName, mode: "0o644" }, JSON.stringify(repositoriesJson))
 }
 
 const processPreloading = async () => {
@@ -397,12 +361,19 @@ const processPreloading = async () => {
   // 8. download and process layers
   await downloadProcessLayers(manifests, layers, pack, packFile)
 
+  // 9. Add the `images` related files
   await packImageFiles(manifests, packFile)
 
+  // 10. merge repositories.json
   await mergeRepositories(manifests, packFile)
 
   // close tarball
   pack.finalize()
 }
 const preloaded = await processPreloading()
-console.log(`=== Your tarball is ready in the out folder === `)
+logger.warn(`=== Your tarball is ready in the out folder === `)
+
+logger.warn(`=== in files are in verbose logs in the logs folder === `)
+logger.warn(`=== packed files are in debug logs in the logs folder === `)
+
+logger.warn(`=== to turn down the logs, edit line 4 consoleLevel in logger.mjs === `)

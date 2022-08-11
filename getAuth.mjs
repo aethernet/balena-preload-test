@@ -1,11 +1,12 @@
 import { fs } from 'zx';
 import os from 'os';
 
-export const getAuthHeaders = async (options) => {
+export const getAuthHeaders = (options) => {
     return {
         auth: {
           username: options?.user || 'bob',
-          password: options?.password || await fs.readFileSync(`${os.homedir()}/.balena/token`, 'utf8')
+          password: options?.password || fs.readFileSync(`${os.homedir()}/.balena/token`, 'utf8')
+          // password: options?.password || "$(cat < ~/.balena/token)"
         },
         "Docker-Distribution-API-Version": 'registry/2.0',
       }
