@@ -1,6 +1,5 @@
 import crypto from "crypto"
 import gunzip from "gunzip-maybe"
-
 import tar from "tar-stream"
 import digestStream from "digest-stream"
 import path from "path"
@@ -13,15 +12,6 @@ import { fileURLToPath } from "url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const baseInPath = path.join(__dirname, "in")
-
-// variables
-const app_id = "7ea7c15b12144d1089dd20645763f790" // "ed91bdb088b54a3b999576679281520a" ee6c3b3f75ae456d9760171a27a36568
-const release_id = "302261f9d08a388e36deccedac6cb424" // "2f24cd2be3006b029911a3d0da6837d5" 
-const balenaosRef = "expanded-aarch64"
-const user = "edwin3"
-const password = process.env.PASSWD
-
-if (!password) throw new error("Password is missing, launch this with `PASSWD=****** node streaming.mjs`")
 
 /** 
  * Get repositories.json for a balenaos version
@@ -62,7 +52,6 @@ const extractImageIdsFromAppsJson = ({ appsJson, app_id, release_id }) => {
 
 /**
  * Download Distribution Manifest
- * //TODO: should be a call to the registry, until that code is ready, i'm faking it using fs
  * @param {[]string} images - array of images
  * @returns {[]json} - array of distribution manifests
  */
@@ -101,107 +90,56 @@ const computeChainId = ({ previousChainId, diff_id }) => crypto.createHash("sha2
  * @param {string} cache_id - generated cache_id
  * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
  */
-// const layerStreamProcessing = (layerStream, pack, cache_id, compressedSize, layer) =>
-//   new Promise((resolve, reject) => {
-//     const tarStreamExtract = tar.extract()
+async function layerStreamProcessing(layerStream, packStream, cache_id, compressedSize, layer) {
+  const extract = tar.extract()
   
-//     // will hold diff_id value once the hash is done
-//     let diff_id = null
-//     let size = -1
-
-//     function listenerFn(resultDigest, length) {
-//       diff_id = `sha256:${resultDigest}`
-//       size = length
-//     }
-
-//     const digester = digestStream("sha256", "hex", listenerFn)
-
-//     layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-//            .pipe(digester) // compute hash and forward
-//            .pipe(tarStreamExtract) // extract from the tar
-
-//     tarStreamExtract.on("entry", function (header, stream, callback) {
-//       // moving to the right folder in tarball
-//       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-//       // write to the tar
-//       const headerTest = header;
-//       // const headerPipe = pack.entry(header, callback)
-//       // const callBackName = callback;
-//       // stream.pipe(headerPipe)
-//     })
-
-
-//     tarStreamExtract.on("finish", function () {
-//       const diffed = { diff_id, size }
-//       // WARNING: i'm worried we might have a race condition here, I don't have "proof" that the digester callback has been properly called before this resolve occurs
-//       resolve(diffed)
-//     })
-
-//     tarStreamExtract.on("error", function (error) {
-//       const err = error;
-//       console.log(error, 'error')
-//       /**
-//       'Error: Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?\n    
-//       at exports.decode (test/node_modules/tar-stream/headers.js:262:43)\n 
-//       at Extract.onheader (test/node_modules/tar-stream/extract.js:123:39)\n    
-//       at Extract._write (test/node_modules/tar-stream/extract.js:24…e_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:398:5)\n    
-//       at Writable.write (test/node_modules/tar-stream/node_modules/readable-stream/lib/_stream_writable.js:307:11)\n    
-//       at PassThroughExt.ondata (node:internal/streams/readable:766:22)\n    
-//       at PassThroughExt.emit (node:events:537:28)\n    
-//       at addChunk (node:internal/streams/readable:324:12)\n    
-//       at readableAddChunk (node:internal/streams/readable:297:9)'
-//        */
-
-//       reject(error)
-//     })
-//   })
-
-
-/**
- * Promise : Layer Stream Processing
- * @param {readableStream} layerStream - byte stream of the layer archive (tar+gz)
- * @param {tar.pack} pack - tar pack
- * @param {string} cache_id - generated cache_id
- * @return {object} {diff_id, size} - hash digest of the tar archive (unzipped) and size in byte
- */
-async function layerStreamProcessing(layerStream, pack, cache_id, compressedSize, layer, ) {
-  // const layerStream2 = layerStream.toBuffer();
-  // const gunzip = zlib.createGunzip();
-  const extract = tar.extract();
+  // Promisify the event based control flow
   return new Promise((resolve) => {
+    // 0. Setup the digester
     let diff_id = null
     let size = -1
-    const listenerFn = (resultDigest, length) => {
+    const digesterCb = (resultDigest, length) => {
       diff_id = `sha256:${resultDigest}`
       size = length
     }
-    const digester = digestStream("sha256", "hex", listenerFn)
+    const digester = digestStream("sha256", "hex", digesterCb)
 
+    // 4. tar extracted happens here
     extract.on('entry', (header, stream, cb) => {
+      // 5. change header to give file its destination folder in the output tarball
       header.name = path.join("docker", "overlay2", cache_id, "diff", header.name)
-      const headerPipe = pack.entry(header, cb)
+      // 6. send file to the output tarball packer
+      const headerPipe = packStream.entry(header, cb)
       stream.pipe(headerPipe)
       // stream.on('end', () => {
       //   cb();
       // });
       // stream.resume();
     });
+
+    // 7. when this layer finished extraction, we get the digest (diff_id) and size from the digester
+    // then resolve the promise to allow moving on to the next layer
     extract.on('finish', () => {
       const diffed = { diff_id, size }
       resolve(diffed);
     });
-    layerStream.pipe(gunzip()) // uncompress if necessary, will pass thru if it's not gziped
-        .pipe(digester) // compute hash and forward
-        .pipe(extract) // extract from the tar
-    // gunzip.pipe(digester).pipe(extract).end(layerStream);
+
+    layerStream.pipe(gunzip()) // 1. uncompress if necessary, will pass thru if it's not gziped
+        .pipe(digester) // 2. compute hash and forward (this is a continuous process we'll get the result at the end)
+        .pipe(extract) // 3. extract from the layer tar archive (generate `entry` events cf 4.)
   });
 }
 
 /**
  * PromisePacker
  * Promisify tar-stream.pack.entry ( https://www.npmjs.com/package/tar-stream )
+ * 
+ * @param {tar-stream.pack} pack - tar-stream.pack.entry
+ * @returns {Function} packer - function to return the promisified packer
+ * 
  * @param {object} header - tar-stream.pack.entry header
  * @param {string} value - tar-stream.pack.entry value
+ * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
  * */
 const promisePacker = (pack) => (header, value, cb) =>
@@ -216,14 +154,13 @@ const promisePacker = (pack) => (header, value, cb) =>
 // 5. create a `layers` array of object to keep track of what we're doing
 // format is
 // {
+//  "token": registryAuthToken,
 // 	"image_name": image_name
 //  "image_id": image_id
 // 	"gzip_id": layerDownloadId,
-// 	"cache_id": random(32),
 //  "parent_diff_id": diff_id(n-1)
 // 	"diff_id": diff_id,
 // 	"chain_id": sha256(chain_id(n-1) + ' ' + diff_id(n))
-// 	"lower": undefined,
 // 	"size": undefined,
 // 	"link": generateLinkId(),
 // 	"isDuplicate": false
@@ -231,8 +168,10 @@ const promisePacker = (pack) => (header, value, cb) =>
 // }
 async function getLayers(manifests) {
   return manifests
-    .map(({manifest, image_name, image_id, diff_ids, token }) => {
-      // compute and generate values for all the layers from all images, while deduplicating cache and link
+    .map(({ diff_ids, token }) => {
+      // loops on images and compute / generate values all layers
+      // use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
+      // note : we'll generate `cache_id` later when processing the layer and link back then
       const computedLayers = []
       for (const key in diff_ids) {
         const diff_id = diff_ids[parseInt(key)]
@@ -245,16 +184,18 @@ async function getLayers(manifests) {
           chain_id,
           parent: parseInt(key) > 0 ? computedLayers[parseInt(key) - 1].chain_id : null,
           isDuplicate,
-          link: isDuplicate ? duplicateOf[0].link : crypto.randomBytes(13).toString("hex").toUpperCase(),
-          cache_id: null, // we'll generate it later and populate back
+          link: isDuplicate ? duplicateOf[0].link : crypto.randomBytes(13).toString("hex").toUpperCase()
         })
       }
       return computedLayers
     })
-    .map((layers) => {
+    .map((imageLayers) => {
       // 7. compute the lower link chain
-      const chain = layers.map((layer) => `l/${layer.link}`)
-      return layers.map((layer, key) => ({
+      // `lower` chain is a string composed of the path to the `link` of all lower layers in the chain
+      // i.e. : `l/*sublayer1link*:l/*sublayer2link:l/*sublayer3link`
+      // lowest layer doesn't have any (empty lower)
+      const chain = imageLayers.map((layer) => `l/${layer.link}`)
+      return imageLayers.map((layer, key) => ({
         ...layer,
         lower: key > 0 ? chain.slice(0, key).join(":") : null,
       }))
@@ -263,17 +204,31 @@ async function getLayers(manifests) {
 }
 
 // setup tar-stream
-const prepareTarball = () => {
+const prepareTarball = (outputStream) => {
   const pack = tar.pack()
-  const tarball = fs.createWriteStream(path.join(__dirname, "out", "tarball.tar"))
-  pack.pipe(tarball) //TODO: output to a file, should eventually be a http response
+  pack.pipe(outputStream)
   return pack
 }
 
-// 8. download and process layers
-const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
+/** DownloadProcessLayers 
+ * // 8. download and process layers
+ * 
+ * This is the meaty part of the process. 
+ * For each layer it will (on stream) : 
+ *  - stream from registry
+ *  - gunzip
+ *  - digest (on the fly)
+ *  - untar
+ *  - rename files to match the destination directory
+ *  - tar (`pack`)
+ *  - stream to output
+ * 
+ * Then create all metadata files, `tar` and stream them to output using `packFile`
+*/
+const downloadProcessLayers = async (manifests, layers, packStream, packFile) => {
 
   // TODO, this is problematic, its not deduping layers which comes from the SV (host apps)
+  // FIXME: why aren't we using the preprocessed layers here ? 
   const processingLayers = manifests
     .map(({ manifest, image_name, token }) => manifest.layers.map((layer) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] })))
     .flat()
@@ -283,30 +238,35 @@ const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
   for (const key in processingLayers) {
     const { layer, image_name, compressedSize, token } = processingLayers[key]
     console.log(`=> ${parseInt(key) + 1} / ${processingLayers.length} : sha256:${layer}`)
-    // we generate random chain_id for the layer here (instead of doig so when pre-computing layer infos)
+    
+    // we generate the random chain_id for the layer here (instead of doig so when pre-computing layer infos)
     // like this we can stream the layer diff folder prior to knowing it's diff_id
     // to get the diff_id we need to hash (sha256) the layer `tarball`, which we cannot do before gettin the whole layer
-    // so we'll start streaming, and compute the `sha256` at the same time, once the whole layer is downloaded we'll
-    // attach the cache_id with all (in case of duplicates) diff_id
+    // we'll stream while computing the `sha256` at the same time, once the whole layer has been processed we'll
+    // attach the cache_id with all layers with matching `diff_id` (might be multiples as we might have duplicates)
     const cache_id = crypto.randomBytes(32).toString("hex")
-    // processing the stream
+    
     try {
-      const { registryUrl, imageUrl, parsedImage } = await getUrls(image_name);
-      const baseInPathSub = `${baseInPath}/images/${parsedImage.repository}`;
-      const layerStream = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize}, baseInPathSub);
+      // get the url
+      const {imageUrl} = getUrls(image_name)
+      
+      // get the stream
+      const layerStream = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize});
+      
+      // process the stream and get back `size` (uncompressed) and `diff_id` (digest)
+      const {size, diff_id} = await layerStreamProcessing(layerStream, packStream, cache_id, compressedSize, layer)
 
-      const {size, diff_id} = await layerStreamProcessing(await layerStream, pack, cache_id, compressedSize, layer)
-
-      // // find all layers related to this archive
+      // find all layers related to this archive
       const relatedLayers = layers.filter((layer) => layer.diff_id === diff_id);
 
+      // create the metadata and link files for all related layers
       for (const { chain_id, diff_id, parent, lower, link } of relatedLayers) {
-        // create all other files and folders required for this layer
+        // compute useful paths
         const dockerOverlay2CacheId = path.join("docker", "overlay2", cache_id)
         const dockerOverlay2l = path.join("docker", "overlay2", "l")
         const dockerImageOverlay2LayerdbSha256ChainId = path.join("docker", "image", "overlay2", "layerdb", "sha256", chain_id)
 
-        // symlink from `l/_link_` to `../_cache_id_/diff`
+        // create symlink from `l/_link_` to `../_cache_id_/diff`
         await packFile({
           name: path.join(dockerOverlay2l, link),
           type: "symlink",
@@ -328,7 +288,13 @@ const downloadProcessLayers = async (manifests, layers, pack, packFile) => {
   }
 }
 
-// 9. Add the `images` related files
+
+/**
+ * Generate and add the "images" related metadata
+ * // 9. Add the `images` related files
+ * @param {object} manifests - images manifests
+ * @param {Promise} packFile - tar output file packer as promise
+ */
 const packImageFiles = async (manifests, packFile) => {
   const dockerImageOverlay2Imagedb = path.join("docker", "image", "overlay2", "imagedb")
 
@@ -345,12 +311,17 @@ const packImageFiles = async (manifests, packFile) => {
   }
 }
 
-// 10. merge repositories.json
-// TODO: this should be done by downloading the `repositories.json` linked to the balenaos image we're going to stream
-// Those files shouls be placed in s3 along the expanded .img so we don't need to extract it each time we serve an image
-// In the meantime I'll take one from the `in` folder
-const mergeRepositories = async (manifests, packFile) => {
+/**
+ * Prepare repositories object for each images, merge with the existing one (from the os image) and write to the output tar stream
+ * TODO : this should be splitted into pure functions
+ * // 10. merge repositories.json
+ * @param {object} manifests - images manifests
+ * @param {Promise} packFile - tar output file packer as promise
+ */
+const mergeRepositories = async (manifests, packFile, balenaosRef) => {
   const repositories = []
+
+  // create all repositories fragments
   for (const { image_id, image_name, image_hash } of manifests) {
     // prepare repositories
     repositories[image_name] = {
@@ -359,15 +330,26 @@ const mergeRepositories = async (manifests, packFile) => {
     }
   }
   
+  // get the balenaos original repositories.json
   const repositoriesJson = getRepositoriesJsonFor(balenaosRef)
+
+  // merge
   for (const repository of repositories) {
     repositoriesJson[repository] = {...repository}
   }
 
+  // output
   await packFile({name: path.join("docker", "image", "overlay2"), mode: "0o644" }, JSON.stringify(repositoriesJson))
 }
 
-const processPreloading = async () => {
+/**
+ * Main Processing function
+ * 
+ * Timing is important.
+ * As we're outputing to a tar stream
+ * We need to kind of be synchronous (one file out at any given time)
+ */
+const streamPreloadingAssets = async ({outputStream, user, password, app_id, release_id, balenaosRef}) => {
   // ##############
   // Processing
   // ##############
@@ -391,18 +373,18 @@ const processPreloading = async () => {
   const layers = await getLayers(manifests)
 
   // prepare tarball packer
-  const pack = prepareTarball() // this one is streamable
-  const packFile = promisePacker(pack) // this one is a promise
+  const packStream = prepareTarball(outputStream) // this one is streamable
+  const packFile = promisePacker(packStream) // this one is a promise
 
   // 8. download and process layers
-  await downloadProcessLayers(manifests, layers, pack, packFile)
+  await downloadProcessLayers(manifests, layers, packStream, packFile)
 
   await packImageFiles(manifests, packFile)
 
-  await mergeRepositories(manifests, packFile)
+  await mergeRepositories(manifests, packFile, balenaosRef)
 
   // close tarball
-  pack.finalize()
+  packStream.finalize()
 }
-const preloaded = await processPreloading()
-console.log(`=== Your tarball is ready in the out folder === `)
+
+export default streamPreloadingAssets

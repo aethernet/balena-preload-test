@@ -65,7 +65,7 @@ function getImageUrl({ registry, namespace, repository }) {
 /** getAllBlobs
   /v2/<name>/blobs/<digest>
 */
-export const getBlob = async (imageUrl, token, layer, baseInPathSub) => {
+export const getBlob = async (imageUrl, token, layer) => {
   const options = {
     "method": "GET",
     "responseType": 'stream',
@@ -234,7 +234,7 @@ async function getRealmResponse(url, authHeaders) {
   }
 }
 
-export const getUrls = async (image, layer) => {
+export const getUrls = (image, layer) => {
   const parsedImage = dockerParseImage(image);
   const registryUrl = getRegistryUrl(parsedImage, layer);
   const imageUrl = getImageUrl(parsedImage);
