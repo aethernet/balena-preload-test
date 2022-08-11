@@ -1,7 +1,7 @@
 import winston from 'winston';
 import { format } from 'logform';
 
-const consoleLevel = 'debug';
+const consoleLevel = 'verbose';
 
 const warnLevels = {
   levels: {
