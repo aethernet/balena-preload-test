@@ -1,4 +1,4 @@
-import streamPreloadingAssets from "./streaming.mjs";
+import streamPreloadingAssets from "./lib/streamPreloadingAssets.mjs";
 import path from "path"
 import fs from "fs-extra"
 import { fileURLToPath } from "url"

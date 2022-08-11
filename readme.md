@@ -3,31 +3,37 @@
 ## Purpose
 This PoC is part of a bigger `.etch` effort.
 
-The puropose of these script is to produce the minimal files to inject in clean balena os image to preload a complete application.
-In other terms, we need to get the same files `balena-engine` would produce when pulling images for an app without using `balena-engine`, `docker` or a similar engine.
+The puropose of these script is to produce the minimal files to inject in a clean balena os image to preload a complete application.
+In other terms, we need to get the same files `balena-engine` would produce when pulling images for an app without using `balena-engine`, `docker` or any similar engine.
 
 Those files are the ones that usualy lives in `/var/lib/docker/images/...` and `/var/lib/docker/overlay2/...`.
 
-By design those script only works for an `overlay2` driver as it's the only one currently used by `balena-engine`.
+By design those script only works for an `overlay2` driver as it's the only one currently used by recent `balena-engine`.
+
+This is processing the assets "on the wire". Meaning we're computing the assets as we're streaming them from the registry. There should be no hit on the filesystem.
+As the processing is actually quite fast, this shouldn't have a minimal impact on speed.
 
 ## Warning
-This is a PoC build for special narrow use case. It's not recommended to mess with the content of `/var/lib/docker`. 
+This is a PoC build for a special narrow use case. It's not recommended to mess with the content of `/var/lib/docker`. 
 Play with it at your own risk and be sure to have backup of your important stuff.
 
 ## Alternatives
 An earlier attempt at pre-loading was based on file extraction from the fs of a running `balena-engine`. While it was working (cf `extraction-deprecated` branch), this was impractial in the context of the balena infrastructure and has been abandoned in favor of this simpler static method.
 
 ## Process
-1. Get an apps.json
-2. Run extractApp.mjs (will run static.mjs for each image of the app)
-3. Get a blank balenaos.img
+1. Get an apps.json and place in `in` folder
+2. Place a expanded `balenaos.img` in `in` folder
+3. Extract `repositories.json`from `balenaos.img` and place it along in `in` folder
+4. Configure for your needs (in `main.mjs`)
+5. Run `main.mjs`
 4. Mount the balenaos.img filesystem (ext4)
-5. Run mergeRepositories.mjs
-6. Run inject.mjs
-7. Unmout the balenaos.img
-8. Flash balenaos.img and run on your device
+6. Run `inject.mjs`
+7. Unmout the `balenaos.img`
+8. Flash `balenaos.img` and run on your device
 
 ### Get `apps.json`
+
+Note : This will soon be automated thanks to a new api endpoint to get the target state of a "future" device in a fleet.
 
 We need a v3 of `apps.json` which will only work with `supervisor v13+` (fairly recent version of belena os at the time of writing).
 
@@ -50,34 +56,25 @@ You need to remove the first `key` and get the content one level up so it looks 
 Save that file as `apps.json` in the repo `in` folder.
 
 ## Generate assets
-### extractApp.mjs`
+## main.mjs
+- call `streamPreloadingAssets.mjs` with parameters
+- put the resulting tarstream in file (`out/tarball.tar`)
 
-- parse the `apps.json` to get a list of all images required to run the app.
-- call `static.mjs` for each of those images (cf below)
-- archive all the files into a tarball (`out.tar`)
+### streamPreloadingAssets.mjs
+- parse the `apps.json`
+- get all images `distribution manifests`
+- get all images `configuration manifests`
+- compute all `chain_id` and dedupe what it can
+- stream all layers, gunzip, digest `diff_id`, untar, move to a random cache folder
+- links cache folders with layer
+- generate all metadata for layers and images (including a merged `repositories.json`)
+- stream result a tarstream
 
-### static.mjs
-- download the image from the registry using `skopeo`.
-- parse the manifest to list layers
-- create the folder structure in `out` directory (`docker/image/overlay2/...` `docker/overlay2/...`)
-- compute `diff_id` and `chain_id` for each layers
-- generate random `link` and `cache_id` for each layers
-- extract the layer content
-- create all the metadata files requires for the image and each layers
-- put the image json at the right place
-- generate a snippet to be later merged in `repositories.json`
-
-### mergeRepositories.mjs
-This is a script to be run between `extractApp.mjs` and  `inject.mjs`.
-
-Warning : this script expects mounted `balenaos.img` partitions (`resin-data`)
-
-- get `repositories.json` from the balenaos mounted filesystem
-- extract all partial `*.repositories.json` (created by `static.mjs` (one per image)) from `out.tar` 
-- inject the partials inside the balenaos `repositories.json`
-- add the new `repositories.json` to `out.tar`
-
-NB: this is not part of `inject.mjs` so we can produce a complete `out.tar` ready to be injected.
+### getManifest.mjs
+Deals with all requests to the registry (only `v2` is supported)
+- get manifest
+- get blob
+- get token
 
 ### inject.mjs
 Warning : this script expects a mounted expanded `balenaos.img` partitions (`resin-data` and optionally `resin-boot`) with enough free space in `resin-data` to hold all the preloading assets.
@@ -222,11 +219,10 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 ## TODO: 
 - automate the retrieval of `apps.json` (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the fake device).
-- replace `skopeo` with either a npm module to interact with `docker registry v2` or direct call the the api.
-- remove `fs` from the mix and do all transformation in memory then directly stream to the tarball archive.
+- refactor in typescript
+- write a tests
 
 ## Known limitations and (maybe) important difference between extracted and generated method
 - in layerdb we skiped the creation `split-tar.json.gz` as it's related to distribution. It's used to ensure we can recreate the exact same tarball for a layer from the `diff` folder content and therefore upload back to a registry the same layer (with the same hash -> same name). Uploading an image to a registry from a preloaded app is not in the scope of those script, so we're not generating this file.
-- `size` (in layerdb) is wrong (always bigger than actual size), but it's not really a problem
 - `lastUpdate` date is generated with less precision than the original ones (3 digit ms instead of ... 7 or 8) this has no impact whatsoever
 - we only created the required files to run the image, more metadata exist when pulling an image from the registry from the engine
