@@ -1,9 +1,22 @@
 {
+  "name": "balena-preload-test",
+  "version": "1.0.0",
+  "description": "preloading",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "node main.mjs"
+  },
   "dependencies": {
     "digest-stream": "^2.0.0",
-    "fs-extra": "^10.1.0",
     "gunzip-maybe": "^1.4.2",
-    "tar-stream": "^2.2.0",
-    "zlib": "^1.0.5"
+    "tar-stream": "^2.2.0"
+  },
+  "devDependencies": {
+    "fs-extra": "^10.1.0",
+    "winston": "^3.8.1"
+  },
+  "engines": {
+    "node": "^16.13.0",
+    "npm": "^8.1.1"
   }
 }
