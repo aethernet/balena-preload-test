@@ -1,16 +1,17 @@
 import streamPreloadingAssets from "./lib/streamPreloadingAssets.mjs";
-import path from "path"
 import fs from "fs-extra"
-import { getEnvs } from "./lib/getAuth.mjs";
-import { fileURLToPath } from "url"
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-  
-const { app_id, release_id, balenaosRef, user, password } = getEnvs()
+import "dotenv/config"
+
+const app_id = process.env.APPID
+const release_id = process.env.RELEASEID
+const balenaosRef = process.env.BALENAOS
+const user = process.env.USER
+const password = process.env.PASSWORD
+const tarball = process.env.TARBALL
 
 // TODO: output is currently a file, it should become the response of a http request
-const outputStream = fs.createWriteStream(path.join(__dirname, "out", "tarball.tar"))
+const outputStream = fs.createWriteStream(tarball)
 
 await streamPreloadingAssets({outputStream, user, password, app_id, release_id, balenaosRef})
 
-console.log(`=== Your tarball is ready in the out folder === `)
+console.log(`=== Your tarball is ready : ${tarball} ===`)

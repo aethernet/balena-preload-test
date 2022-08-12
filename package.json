@@ -7,7 +7,10 @@
     "start": "node main.mjs"
   },
   "dependencies": {
+    "axios": "^0.27.2",
     "digest-stream": "^2.0.0",
+    "docker-parse-image": "^3.0.1",
+    "dotenv": "^16.0.1",
     "gunzip-maybe": "^1.4.2",
     "tar-stream": "^2.2.0"
   },
