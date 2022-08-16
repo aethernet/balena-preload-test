@@ -1,8 +1,9 @@
 import winston from 'winston';
 import { format } from 'logform';
+import "dotenv/config"
 
-const consoleLevel = 'verbose';
-
+const consoleLevel = process.env.CONSOLELEVEL || 'error';
+console.log(`process.env.CONSOLELEVEL: ${process.env.CONSOLELEVEL}`);
 const warnLevels = {
   levels: {
     error: 0,
