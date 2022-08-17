@@ -1,4 +1,4 @@
-import streamPreloadingAssets from "./lib/streamPreloadingAssets.mjs";
+import streamPreloadingAssets from "./lib/streamPreloadingAssets.mjs"
 import fs from "fs-extra"
 import "dotenv/config"
 
@@ -12,6 +12,9 @@ const tarball = process.env.TARBALL
 // TODO: output is currently a file, it should become the response of a http request
 const outputStream = fs.createWriteStream(tarball)
 
-await streamPreloadingAssets({outputStream, user, password, app_id, release_id, balenaosRef})
+// subFolder in the tar archive where we keep the injectables
+const injectFolder = "inject/resin-data"
+
+await streamPreloadingAssets({ outputStream, user, password, app_id, release_id, balenaosRef, injectFolder })
 
 console.log(`=== Your tarball is ready : ${tarball} ===`)
