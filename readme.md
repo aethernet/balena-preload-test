@@ -11,7 +11,7 @@ Those files are the ones that usualy lives in `/var/lib/docker/images/...` and `
 By design those script only works for an `overlay2` driver as it's the only one currently used by `balena-engine`.
 
 ## Warning
-This is a PoC build for special narrow use case. It's not recommended to mess with the content of `/var/lib/docker`. 
+This is a PoC build for special narrow use case. It's not recommended to mess with the content of `/var/lib/docker`.
 Play with it at your own risk and be sure to have backup of your important stuff.
 
 ## Alternatives
@@ -33,7 +33,7 @@ We need a v3 of `apps.json` which will only work with `supervisor v13+` (fairly 
 
 To get this file you need a provisioned device on a fleet, note that the device online status doesn't matter.
 
-Go to the dashboard, open your browser dev tools, go to the network panel, browse to the device -> diagnostic -> supervisor state. Search the `xhr` call for one that looks like 
+Go to the dashboard, open your browser dev tools, go to the network panel, browse to the device -> diagnostic -> supervisor state. Search the `xhr` call for one that looks like
 `https://api.balena-cloud.com/device/v2/_deviceid_/state` (note that device `id` is not equal to `uuid`).
 
 Replace `v2` by `v3` and run it back. You can do that with a fetch in the dev tool console, or with curl
@@ -73,36 +73,41 @@ This is a script to be run between `extractApp.mjs` and  `inject.mjs`.
 Warning : this script expects mounted `balenaos.img` partitions (`resin-data`)
 
 - get `repositories.json` from the balenaos mounted filesystem
-- extract all partial `*.repositories.json` (created by `static.mjs` (one per image)) from `out.tar` 
+- extract all partial `*.repositories.json` (created by `static.mjs` (one per image)) from `out.tar`
 - inject the partials inside the balenaos `repositories.json`
 - add the new `repositories.json` to `out.tar`
 
 NB: this is not part of `inject.mjs` so we can produce a complete `out.tar` ready to be injected.
 
 ### inject.mjs
-Warning : this script expects a mounted expanded `balenaos.img` partitions (`resin-data` and optionally `resin-boot`) with enough free space in `resin-data` to hold all the preloading assets.
 
-- untar `out.tar` on top of `resin-data`
-- if `resin-boot` is mounted and a `static_ip` file exist along the scripts, that file will be copied to `resin-boot` partition as `/system-connections/static_ip`. This is useful to preload an ethernet static ip network configuration.
-- if `resin-boot` is mounted and a `config.json` file exist in the `in` folder, that file will be copied to `resin-boot` partition as `/config.json`. This is useful to preload multiple fleets using the same balenaos image.
+inject.mjs extracts assets from a etcher archive while injecting the assets into the disk image
 
-## How to inject to a balenaos `.img`
+```
+./inject.mjs /path/to/input /path/to/output
+```
 
-1. Mount the two partitions (`resin-data` and `resin-boot`) from balenaos inflated, expanded image (cf `resizeBalenaOsPartition.md` for details)
-2. Run `inject.mjs` with parameters pointing to the mounted `resin-data` (i.e : `inject.mjs --resin-data /Volumes/resin-data --resin-boot /Volumes/resin-boot`). Note: `--resin-boot` is optional (cf `inject settings` section below)
-3. Unmount all the partitions from the image
-4. Burn the image to a sd card using etcher
-5. Insert sd in device and boot up
-6. Ssh to the device (i.e. if using the static ethernet ip `balena ssh 10.0.0.1`)
-7. Test that everything is running as it should (`balena-engine ps` should returns all your containers running, `balena-engine images` should list all images (apps + supervisor))
+Preparing archive:
+  archive should be created first with the disk image, then with
+  directory of file to inject under the 'inject' directory,
+  with the partition number as the subdirectory.
+    > tar cvvf /path/to/input /path/to/disk/image /path/to/inject
 
-### Inject Settings
+Example:
+  For this example, we assume the following file tree:
+    .
+    ├── image.img
+    └── inject
+        └── 5
+            ├── testfile1.txt
+            └── testfile2.txt -> ./testfile1.txt
+  where we with to inject the file 'testfile1.txt' into the
+  root directory of partition 5
 
-You can add two optional settings file :
-  - `config.json` (in the `in` folder)
-  - `static_ip` (in the `root` folder of this project)
-
-If `resin-boot` partition is mounted and provided and one of those optional files are availble, they will be injected in the boot partition (at root for `config.json` and in `system-connectons` for `static_ip`).
+  1. Prepare archive
+    tar cvvf test.tar ./image.img inject
+  2. Extract disk image while injecting files:
+    ./inject.mjs ./image.img inject
 
 #### `config.json`
 You can get `config.json` for your fleet from the balena cloud dashboard. Add a device to the fleet and download the `_appname_config.json` file instead of the os `.img.zip` (be sure to select `dev` and not `prod`), then rename the file and drop it in the `in` folder. This way you can reuse the same expanded os base image while testing different fleets.
@@ -144,7 +149,7 @@ On a running engine, docker fs is located in `/var/lib/docker/`, if not specifie
 
 To transplant/unpack an image we need :
 
-One per layer (cf next section for id generation): 
+One per layer (cf next section for id generation):
 - `image/overlay2/layerdb/sha256/_chain-id_/cache-id` (utf-8 text file - content is a random 48 lowercap alphanum string, also used as the name the corresponding `overlay2` folder below)
 - `image/overlay2/layerdb/sha256/_chain-id_/diff` (utf-8 text file - content is the diff-id)
 - `image/overlay2/layerdb/sha256/_chain-id_/parent` (utf-8 text file - content is the chain-id of the parent layer)
@@ -170,7 +175,7 @@ SHA256 Hash of the tar archive of the layer (the actual content of the layer) as
 
 This is listed in the image main json as a list of ordered `diff-id`.
 
-Note that the tar.gzip files you'll probaly pull from the registry are named with another sha256 hash run on the compressed archive. 
+Note that the tar.gzip files you'll probaly pull from the registry are named with another sha256 hash run on the compressed archive.
 You need to gunzip the archive and compute the hash to get the `diff-id`.
 
 ### chain-id
@@ -179,7 +184,7 @@ You need to gunzip the archive and compute the hash to get the `diff-id`.
 Except for highest layer as that one has no parent so for that one `chainId` = `diffId`.
 
 ### cache-id
-This one is a random string of 32 lower caps alpha numeric characters. 
+This one is a random string of 32 lower caps alpha numeric characters.
 It's the name of the `overlay2` folder which will contain the uncompressed, unarchived content of the layer and is referenced in the layer `cache-id` file.
 
 ## link
@@ -220,7 +225,7 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 [https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html](https://programmer.ink/think/container-principle-understand-layerid-diffid-chainid-cache-id.html)
 
-## TODO: 
+## TODO:
 - automate the retrieval of `apps.json` (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the fake device).
 - replace `skopeo` with either a npm module to interact with `docker registry v2` or direct call the the api.
 - remove `fs` from the mix and do all transformation in memory then directly stream to the tarball archive.
