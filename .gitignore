@@ -11,3 +11,5 @@ out_injectable
 success/*
 diff/*
 node_modules/*
+logs/*
+.env
