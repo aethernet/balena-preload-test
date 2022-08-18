@@ -61,36 +61,12 @@ Save that file as `apps.json` in the repo `in` folder.
 
 ## Generate assets
 
-### extractApp.mjs`
-
-- parse the `apps.json` to get a list of all images required to run the app.
-- call `static.mjs` for each of those images (cf below)
-- archive all the files into a tarball (`out.tar`)
-
-### static.mjs
-
-- download the image from the registry using `skopeo`.
-- parse the manifest to list layers
-- create the folder structure in `out` directory (`docker/image/overlay2/...` `docker/overlay2/...`)
-- compute `diff_id` and `chain_id` for each layers
-- generate random `link` and `cache_id` for each layers
-- extract the layer content
-- create all the metadata files requires for the image and each layers
-- put the image json at the right place
-- generate a snippet to be later merged in `repositories.json`
-
-### mergeRepositories.mjs
-
-This is a script to be run between `extractApp.mjs` and `inject.mjs`.
-
-Warning : this script expects mounted `balenaos.img` partitions (`resin-data`)
-
-- get `repositories.json` from the balenaos mounted filesystem
-- extract all partial `*.repositories.json` (created by `static.mjs` (one per image)) from `out.tar`
-- inject the partials inside the balenaos `repositories.json`
-- add the new `repositories.json` to `out.tar`
-
-NB: this is not part of `inject.mjs` so we can produce a complete `out.tar` ready to be injected.
+- copy `.env.dist` to `.env`
+- add an expanded `balenaos.img` in the `in` folder
+- add a `apps.json` file in the `in` folder
+- add a `balenaos.repositories.json` in the `in` folder (should be extracted from the `balenaos.img`)
+- edit `.env` for your config
+- run `node main.mjs`
 
 ### inject.mjs
 
