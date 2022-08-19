@@ -83,6 +83,7 @@ with the partition number as the subdirectory. > tar cvvf /path/to/input /path/t
 
 Example:
 For this example, we assume the following file tree:
+
 ```
 .
 ├── image.img
@@ -230,7 +231,7 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 ## TODO:
 
-- automate the retrieval of `apps.json` (from a device `uuid` which is easy to get from dashboard, or with a `fleet slug` as it's done in the `cli` (creating a fake device, getting the target state, deleting the fake device).
+- automate the retrieval of `apps.json` from the new fleet target state endpoint (when it's merged)
 - refactor in typescript
 - write a tests
 
