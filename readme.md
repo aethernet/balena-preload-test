@@ -83,12 +83,14 @@ with the partition number as the subdirectory. > tar cvvf /path/to/input /path/t
 
 Example:
 For this example, we assume the following file tree:
+```
 .
 ├── image.img
 └── inject
 └── 5
 ├── testfile1.txt
 └── testfile2.txt -> ./testfile1.txt
+
 where we with to inject the file 'testfile1.txt' into the
 root directory of partition 5
 
