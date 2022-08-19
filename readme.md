@@ -87,9 +87,9 @@ For this example, we assume the following file tree:
 .
 ├── image.img
 └── inject
-└── 5
-├── testfile1.txt
-└── testfile2.txt -> ./testfile1.txt
+    └── 5
+        ├── testfile1.txt
+        └── testfile2.txt -> ./testfile1.txt
 ```
 
 where we with to inject the file 'testfile1.txt' into the
