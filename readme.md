@@ -233,6 +233,7 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 
 - automate the retrieval of `apps.json` from the new fleet target state endpoint (when it's merged)
 - handle resin-data partition expension (wip)
+- find a good enough method to determine the size of the soon to be preloaded assets
 - retrieve file of interests (repositiories.json) from the image (wip)
 - refactor in typescript
 - automate tests
@@ -250,13 +251,13 @@ As of now, all the balenaos base images [contains a `Supervisor` service preload
 Problem with those pre-preloaded images is that it's hard to know what they are without extracting files from the balenaos image itself. Best source so far is `repositories.json`, but it doesn't gives us infos about how the layers have been created (remember there's some _randomly named folders_ in some key places).
 
 So we have ~~two~~ three choices :
+
 - A. we get deeper into the os, and map all those folders to reuse them
 - B. we preload the supevisor again, which means we stream those layers twice and we let the engine clean up orphan on first boot
 - C. we use an empty balenaos (no supervisor) and preload it on the fly
 
-C would probably be the best - given we can fix some loose ends like what happen when you don't want an `.etch` file. 
+C would probably be the best - given we can fix some loose ends like what happen when you don't want an `.etch` file.
 
 B is what we're going with for the PoC as it's easy and predictable even if wasteful. It means always streaming the full Supervisor (alpine + node 12 + SV) twice. A solution would be to only do the overlapping layers but it might be early-optimisation as maybe (A) can be a solution.
 
 A would be great if we can read files in data partition without too much trouble. If it's too much, we still can create some sort of a `preloading` manifest at os build stage and keep it somewhere.
-
