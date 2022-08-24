@@ -64,9 +64,12 @@ Save that file as `apps.json` in the repo `in` folder.
 - copy `.env.dist` to `.env`
 - add an expanded `balenaos.img` in the `in` folder
 - add a `apps.json` file in the `in` folder
-- add a `balenaos.repositories.json` in the `in` folder (should be extracted from the `balenaos.img`)
+- add a `VERSION` file in the `in` folder with the version of `balena_supervisor` which is inside balenaos image (comes from S3)
+- add a `device_type.json` file `in` folder (comes from the S3)
 - edit `.env` for your config
 - run `node main.mjs`
+
+Note that both VERSION and device_type.json will be provided by `balena-img` (which fech them from S3 along os image)
 
 ### inject.mjs
 
@@ -88,7 +91,7 @@ For this example, we assume the following file tree:
 .
 ├── image.img
 └── inject
-    └── 5
+    └── 6
         ├── testfile1.txt
         └── testfile2.txt -> ./testfile1.txt
 ```
@@ -96,14 +99,18 @@ For this example, we assume the following file tree:
 where we with to inject the file 'testfile1.txt' into the
 root directory of partition 5
 
-1. Prepare archive
-   tar cvvf test.tar ./image.img inject
-2. Extract disk image while injecting files:
-   ./inject.mjs ./image.img inject
+```
+1.  a. Manually prepare archive
+      tar cvvf test.tar ./image.img inject
+    b. Automagically prepare the archive
+      Use main.mjs to generate the archive
+2.  Extract disk image while injecting files:
+    ./inject.mjs ./image.img inject
+```
 
 #### `config.json`
 
-You can get `config.json` for your fleet from the balena cloud dashboard. Add a device to the fleet and download the `_appname_config.json` file instead of the os `.img.zip` (be sure to select `dev` and not `prod`), then rename the file and drop it in the `in` folder. This way you can reuse the same expanded os base image while testing different fleets.
+You can get `config.json` for your fleet from the balena cloud dashboard. Add a device to the fleet and download the `_appname_config.json` file instead of the os `.img.zip` (be sure to select `dev` and not `prod`). You'll need to inject that file manually in the `boot` partition of the image. This way you can reuse the same expanded os base image while testing different fleets.
 
 #### `static_ip`
 
@@ -234,7 +241,6 @@ As there's at least one image (`balena-supervisor`) installed on a blank balena-
 - automate the retrieval of `apps.json` from the new fleet target state endpoint (when it's merged)
 - handle resin-data partition expension (wip)
 - find a good enough method to determine the size of the soon to be preloaded assets
-- retrieve file of interests (repositiories.json) from the image (wip)
 - refactor in typescript
 - automate tests
 
