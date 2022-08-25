@@ -66,8 +66,10 @@ losetup -c "${LOOP_DEV}"
 # 5. use parted to print free partitions table in scripted mode,  -s --script never prompts for user intervention
 parted -s -a opt "${LOOP_DEV}" "print free"
 
-# 6. manipulate disk partitions to resize partitions to 5GB - Do we need to do partition 4 or just the last partition?
-# parted -s -a opt "${LOOP_DEV}"  "resizepart 4 ${SIZE_PARTITION}"
+# 6. manipulate disk partitions to resize partitions to 5GB - 
+# Partition 4 is the umbrella partition that holds 5 and 6. 
+# If we don't resize 4, partition 6 will not have enough room either.
+parted -s -a opt "${LOOP_DEV}"  "resizepart 4 ${SIZE_PARTITION}"
 parted -s -a opt "${LOOP_DEV}"  "resizepart ${PARTITION_NUMBER} ${SIZE_PARTITION}"
 
 # 7. use parted to print free partitions table to see if resize worked
