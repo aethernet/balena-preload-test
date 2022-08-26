@@ -13,7 +13,7 @@
 # https://antipaucity.com/2017/08/31/fallocate-vs-dd-for-swap-file-creation/
 # https://en.wikipedia.org/wiki/Partition_type
 # https://www.qnx.com/developers/docs/7.0.0/index.html#com.qnx.doc.neutrino.sys_arch/topic/fsys_Partitions.html
-
+# https://unix.stackexchange.com/questions/151644/how-should-i-combine-many-compressed-files-into-one-archive
 # -------------------------------------------------------
 # SET VARS
 # -------------------------------------------------------
