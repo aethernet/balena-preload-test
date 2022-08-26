@@ -25,14 +25,16 @@ An earlier attempt at pre-loading was based on file extraction from the fs of a 
 
 ## Process
 
+
+Note that both VERSION and device_type.json will be provided by `balena-img` (which fech them from S3 along os image)
+
 1. Get an apps.json and place in `in` folder
 2. Place a expanded `balenaos.img` in `in` folder
-3. Extract `repositories.json`from `balenaos.img` and place it along in `in` folder
-4. Configure for your needs (in `main.mjs`)
-5. Run `main.mjs`
-6. Mount the balenaos.img filesystem (ext4)
-7. Run `inject.mjs`
-8. Unmout the `balenaos.img`
+4. Copy `.env.dist` to `.env` and configure to your needs
+5. add a `VERSION` file in the `in` folder with the version of `balena_supervisor` which is inside balenaos image (comes from S3)
+6. add a `device_type.json` file `in` folder (comes from the S3)
+7. Run `main.mjs`
+8. Run `inject.mjs`
 9. Flash `balenaos.img` and run on your device
 
 ### Get `apps.json`
@@ -58,18 +60,6 @@ You need to remove the first `key` and get the content one level up so it looks 
 `{apps: {...}, config: {...}}` and remove `apps.name`.
 
 Save that file as `apps.json` in the repo `in` folder.
-
-## Generate assets
-
-- copy `.env.dist` to `.env`
-- add an expanded `balenaos.img` in the `in` folder
-- add a `apps.json` file in the `in` folder
-- add a `VERSION` file in the `in` folder with the version of `balena_supervisor` which is inside balenaos image (comes from S3)
-- add a `device_type.json` file `in` folder (comes from the S3)
-- edit `.env` for your config
-- run `node main.mjs`
-
-Note that both VERSION and device_type.json will be provided by `balena-img` (which fech them from S3 along os image)
 
 ### inject.mjs
 
