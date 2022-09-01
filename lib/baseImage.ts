@@ -4,10 +4,15 @@
 
 import logger from "../logger"
 
+interface StreamBaseImageIn {
+  pipeStreamFrom: NodeJS.ReadableStream
+  pipeStreamTo: NodeJS.WritableStream
+}
+
 /**
  * Awaitable pipe stream from input to output
  */
-const streamBaseImage = ({ pipeStreamFrom, pipeStreamTo }) =>
+const streamBaseImage = ({ pipeStreamFrom, pipeStreamTo }: StreamBaseImageIn): Promise<boolean> =>
   new Promise((resolve, reject) => {
     logger.warn("== Start streaming base image (balenaOs) @streamBaseImage ==")
 

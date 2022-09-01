@@ -19,11 +19,16 @@ import logger from "../logger"
  */
 const repositoriesJsonInjectionPath = "docker/image/overlay2/repositories.json"
 
+// TODO repositories.json types
+// interface Repositories {
+//   [image_name: string]:
+// }
+
 /**
  * createAllRepositoriesFragments
  */
-const createAllRepositoriesFragments = (manifests) => {
-  const repositories = {}
+const createAllRepositoriesFragments = (manifests: any) => {
+  const repositories: any = {}
   for (const { image_id, image_name, image_hash, isSupervisor, supervisorVersion } of manifests) {
     // prepare repositories
     repositories[image_name] = {
@@ -45,7 +50,7 @@ const createAllRepositoriesFragments = (manifests) => {
  * @param {Array} manifests - images manifests
  * @param {JSON} repositoriesJson - origal repositories.json
  */
-const buildRepositories = ({ manifests }) => {
+const buildRepositories = ({ manifests }: any) => {
   logger.warn("== Build Repositories @buildRepositories ==")
 
   // generate repositories fragments for preloaded images

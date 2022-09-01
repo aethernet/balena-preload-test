@@ -24,11 +24,18 @@
 
 import axios from "axios"
 
+interface supervisorImageNameIn {
+  version: string
+  arch: string
+  api: string
+  token: string
+}
+
 /**
  * Fetch the supervisor image name (pullable url) from api for a version and arch
  *
  */
-const getSupervisorImageNameFor = async ({ version, arch, api, token }) => {
+const getSupervisorImageNameFor = async ({ version, arch, api, token }: supervisorImageNameIn): Promise<string | undefined> => {
   const options = {
     method: "GET",
     headers: {

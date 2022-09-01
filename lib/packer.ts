@@ -1,4 +1,4 @@
-import tar, { Pack } from "tar-stream"
+import tar, { Pack, Headers } from "tar-stream"
 import logger from "../logger"
 
 /**
@@ -13,7 +13,7 @@ import logger from "../logger"
  * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
  * */
-const promisePacker = (pack, injectFolder?) => (header, value, cb?) =>
+const promisePacker = (pack: Pack, injectFolder?: string) => (header: Headers, value: any) =>
   new Promise((resolve, reject) => {
     if (header.name.includes("sha256:")) {
       logger.error(`=> FIXME!! pack header.name: ${header.name}`)
@@ -22,7 +22,6 @@ const promisePacker = (pack, injectFolder?) => (header, value, cb?) =>
     if (injectFolder) header.name = `${injectFolder}/${header.name}`
     pack.entry(header, value, (error) => {
       if (error) reject(error)
-      if (cb) cb()
       resolve(true)
     })
   })

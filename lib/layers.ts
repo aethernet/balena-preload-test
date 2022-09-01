@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
-import digestStream from "digest-stream"
+import { default as digestStream } from "digest-stream"
 import path from "path"
 import { getUrls, getBlob } from "./registry"
 import logger from "../logger"
@@ -10,7 +10,7 @@ import { Pack, Headers } from "tar-stream"
 
 interface LayerMeta {
   size: number
-  diff_id: string
+  diff_id: string | null
 }
 
 interface Layer {
@@ -23,6 +23,11 @@ interface Layer {
   lower?: string
   size?: number
   cache_id?: string
+}
+
+interface LayerRaw {
+  size: number
+  digest: string
 }
 
 /**
@@ -48,7 +53,7 @@ interface Layer {
  * @param {[Object]} manifests - array of image config manifests
  * */
 
-async function getLayers(manifests) {
+async function getLayers(manifests: any) {
   logger.warn(`== getting Layers @getLayers ==`)
   return manifests
     .map(({ diff_ids, token }: { diff_ids: string[]; token: string }) => {
@@ -61,14 +66,13 @@ async function getLayers(manifests) {
         const chain_id =
           parseInt(key) == 0 ? diff_id.split(":")[1] : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chain_id, diff_id })
         const duplicateOf = computedLayers.find((layer) => layer.chain_id === chain_id)
-        const isDuplicate = Boolean(duplicateOf)
         computedLayers.push({
           token,
           diff_id,
           chain_id,
           parent: parseInt(key) > 0 ? computedLayers[parseInt(key) - 1].chain_id : null,
-          isDuplicate,
-          link: isDuplicate ? duplicateOf[0].link : crypto.randomBytes(13).toString("hex").toUpperCase(),
+          isDuplicate: Boolean(duplicateOf),
+          link: duplicateOf ? duplicateOf.link : crypto.randomBytes(13).toString("hex").toUpperCase(),
         })
       }
       return computedLayers
@@ -93,13 +97,13 @@ async function getLayers(manifests) {
  * @param {[Object]} manifests - array of distribution manifests with auth
  * @return {[Object]} layerUrls - array of layers blob digests with athentication token
  */
-const getLayerDistributionDigests = (manifests) => {
+const getLayerDistributionDigests = (manifests: any) => {
   return manifests
-    .map(({ manifest, image_name, token }) =>
-      manifest.layers.map((layer) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
+    .map(({ manifest, image_name, token }: any) =>
+      manifest.layers.map((layer: LayerRaw) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
     )
     .flat()
-    .filter((layer, index, layers) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
+    .filter((layer: Layer, index: number, layers: Layer[]) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
 }
 
 /**
@@ -196,7 +200,15 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
  *
  * Then create all metadata files, `tar` and stream them to output using `packFile`
  */
-const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath }) => {
+
+interface ProcessLayerIn {
+  manifests: any[]
+  layers: Layer[]
+  packStream: Pack
+  injectPath: string
+}
+
+const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath }: ProcessLayerIn) => {
   logger.warn(`== Processing Layers @downloadProcessLayers ==`)
 
   const processingLayers = getLayerDistributionDigests(manifests)
@@ -219,7 +231,7 @@ const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath
       const { size, diff_id }: LayerMeta = await layerStreamProcessing({ layerStream, packStream, cache_id, injectPath })
 
       // find all layers related to this archive
-      const relatedLayers = layers.filter((layer) => layer.diff_id === diff_id)
+      const relatedLayers = layers.filter((layer: Layer) => layer.diff_id === diff_id)
 
       // create the metadata and link files for all related layers
       for (const layer of relatedLayers) {

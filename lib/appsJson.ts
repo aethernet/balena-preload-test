@@ -23,7 +23,7 @@ import fs from "fs-extra"
  * @param {string} release_id - release_id
  * @returns {json} - apps.json object
  */
-const getAppsJson = async ({ app_id, release_id }, auth) => {
+const getAppsJson = async ({ app_id, release_id }: any) => {
   //   // FIXME: is fleetUUID equal to app_id ? If not it will be required
   //   // In production those informations should already be available in image-maker
   //   const options = {
@@ -50,13 +50,19 @@ const getAppsJson = async ({ app_id, release_id }, auth) => {
  * Takes a apps.json and returns the list of images for an app & release.
  * If apps_id and/or release_id is unkown it will return first.
  * // TODO: return all instead of first when no app or release is specified.
- *
- * @param {json} appJson - appsJson
- * @param {string?} app_id - app_id
- * @param {string?} release_id - release_id
- * @returns {[]object} - list of {image_name, commit}
  */
-const getImageIds = ({ appsJson, app_id, release_id }) => {
+interface ImageIdsInput {
+  appsJson: any //TODO: get propertype for appsJson V3
+  app_id: string
+  release_id: string
+}
+
+interface Image {
+  image_name: string
+  image_hash: string
+}
+
+const getImageIds = ({ appsJson, app_id, release_id }: ImageIdsInput): Image[] => {
   const appId = app_id ?? Object.keys(appsJson.apps)[0]
   const releaseId = release_id ?? Object.keys(appsJson.apps?.[appId]?.releases)[0]
   logger.warn(`==> appId: ${appId} & releaseId: ${releaseId}`)

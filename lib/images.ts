@@ -1,8 +1,9 @@
 /** Prepare injectable files for all images */
-const getImagesConfigurationFiles = (manifests) => {
+
+const getImagesConfigurationFiles = (manifests: any) => {
   const dockerImageOverlay2Imagedb = "docker/image/overlay2/imagedb"
   return manifests
-    .map(({ configManifestV2, image_id }) => {
+    .map(({ configManifestV2, image_id }: any) => {
       const shortImage_id = image_id.split(":")[1]
       return [
         {

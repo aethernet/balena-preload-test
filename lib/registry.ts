@@ -286,3 +286,5 @@ export const pullManifestsFromRegistry = async (image, auth) => {
 
   return { manifest, digests, configDigest, configManifestV2, image_id, image_name, diff_ids, imageUrl, token }
 }
+
+export { Manifest }

@@ -7,6 +7,7 @@
     "start": "ts-node main.ts"
   },
   "dependencies": {
+    "@types/gunzip-maybe": "^1.4.0",
     "@types/tar-stream": "^2.2.2",
     "axios": "^0.27.2",
     "digest-stream": "^2.0.0",
