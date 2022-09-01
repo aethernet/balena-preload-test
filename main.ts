@@ -1,4 +1,4 @@
-import streamPreloadingAssets from "./lib/streamPreloadingAssets.js"
+import streamPreloadingAssets from "./lib/streamPreloadingAssets"
 import "dotenv/config"
 import fs from "fs-extra"
 

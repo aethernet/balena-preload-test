@@ -1,8 +1,8 @@
-import logger from "../logger.js"
+import logger from "../logger"
 import axios, { AxiosRequestConfig } from "axios"
 import dockerParseImage from "docker-parse-image"
 import { inspect } from "util"
-import { getAuthHeaders } from "./getAuth.js"
+import { getAuthHeaders } from "./getAuth"
 const featureFlags = {
   justDownload: false,
 }

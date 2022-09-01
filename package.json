@@ -4,9 +4,10 @@
   "description": "preloading",
   "main": "main.mjs",
   "scripts": {
-    "start": "node main.mjs"
+    "start": "ts-node main.ts"
   },
   "dependencies": {
+    "@types/tar-stream": "^2.2.2",
     "axios": "^0.27.2",
     "digest-stream": "^2.0.0",
     "docker-parse-image": "^3.0.1",
@@ -25,6 +26,7 @@
     "fs-extra": "^10.1.0",
     "node-scp": "^0.0.18",
     "p-limit": "^4.0.0",
+    "ts-node": "^10.9.1",
     "winston": "^3.8.1",
     "zx": "^7.0.8"
   },

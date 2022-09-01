@@ -58,13 +58,13 @@ const streamPreloadingAssets = async ({
     ],
   }
 
-  await packManifest({ name: "manifest.json", mode: "0o644" }, JSON.stringify(manifest))
+  await packManifest({ name: "manifest.json", mode: 644 }, JSON.stringify(manifest))
 
   // Beware that knowing the file size in advance is mandatory
   const baseImageStreamEntry = packStream.entry({
     // TOOD: name: `${balenaosRef}.img`, // switch when inject.mjs select baseimage from manifest (currently hardcoded)
     name: "image.img",
-    mode: "0o644",
+    mode: 644,
     size: balenaosSize,
   })
 
@@ -109,11 +109,11 @@ const streamPreloadingAssets = async ({
   // prepare global metadata files
   const globalInjectable = [
     {
-      header: { name: repositoriesJsonInjectionPath, mode: "0o644" },
+      header: { name: repositoriesJsonInjectionPath, mode: 644 },
       content: JSON.stringify(newRepositoriesJson),
     },
     {
-      header: { name: "apps.json", mode: "0o644" },
+      header: { name: "apps.json", mode: 644 },
       content: JSON.stringify(appsJson),
     },
   ]

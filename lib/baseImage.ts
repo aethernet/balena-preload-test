@@ -2,7 +2,7 @@
  * Get the base image we're going to preload assets in (balenaos.img)
  * */
 
-import logger from "../logger.js"
+import logger from "../logger"
 
 /**
  * Awaitable pipe stream from input to output

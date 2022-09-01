@@ -1,5 +1,5 @@
-import tar from "tar-stream"
-import logger from "../logger.js"
+import tar, { Pack } from "tar-stream"
+import logger from "../logger"
 
 /**
  * PromisePacker
@@ -33,7 +33,7 @@ const promisePacker = (pack, injectFolder?) => (header, value, cb?) =>
  * @param {Stream} outputStream
  * @returns Streamable tar packer
  */
-const getTarballStream = (outputStream) => {
+const getTarballStream = (outputStream: NodeJS.WritableStream): Pack => {
   // logger.log(`=> prepareTarball outputStream: ${inspect(outputStream,true,5,true)}`)
   const pack = tar.pack()
   pack.pipe(outputStream)

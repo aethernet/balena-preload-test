@@ -1,4 +1,4 @@
-import logger from "../logger.mjs"
+import logger from "../logger"
 
 /**
  * `Apps.json` is the file that will inform the supervisor of what's has been preloaded, which services should be started and with which config.
@@ -12,9 +12,6 @@ import logger from "../logger.mjs"
 // import logger from "../logger.mjs"
 import path from "path"
 import fs from "fs-extra"
-import { fileURLToPath } from "url"
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 /**
  * Derives Apps.json from target state obtained from the api
