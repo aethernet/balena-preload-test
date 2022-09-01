@@ -5,8 +5,6 @@ import fs from "fs-extra"
 const app_id = process.env.APPID
 const release_id = process.env.RELEASEID
 const balenaosRef = process.env.BALENAOS
-const user = process.env.USER
-const password = process.env.PASSWORD
 const tarball = process.env.TARBALL
 const dataPartition = parseInt(process.env.DATA_PARTITION, 10)
 const supervisorVersion = process.env.SV_VERSION
@@ -32,10 +30,8 @@ balenaosStream.on("open", async () => {
     outputStream,
     balenaosStream,
     balenaosSize,
-    user,
     supervisorVersion,
     arch,
-    password,
     app_id,
     release_id,
     balenaosRef,

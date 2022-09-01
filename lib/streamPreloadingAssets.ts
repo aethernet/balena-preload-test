@@ -1,5 +1,5 @@
 import path from "path"
-import { getAuthHeaders } from "./getAuth"
+import { env } from 'process';
 import { getManifests } from "./registry"
 import { buildRepositories, repositoriesJsonInjectionPath } from "./repositoriesjson"
 import { streamBaseImage } from "./baseImage"
@@ -9,6 +9,22 @@ import { promisePacker, getTarballStream } from "./packer"
 import { getImagesConfigurationFiles } from "./images"
 import { getSupervisorImageNameFor } from "./supervisor"
 import logger from "../logger"
+
+interface PreloadOptions {
+  outputStream: NodeJS.WritableStream
+  balenaosStream: NodeJS.ReadableStream
+  balenaosSize: number
+  balenaos: string
+  app_id: string
+  release_id: string
+  api: string
+  token: string
+  arch: string
+  output: string
+  balenaosRef: string
+  dataPartition: number
+  supervisorVersion: string
+}
 
 /**
  * Main Processing function
@@ -23,22 +39,15 @@ const streamPreloadingAssets = async ({
   balenaosSize,
   supervisorVersion,
   arch,
-  user,
-  password,
   app_id,
   release_id,
   balenaosRef,
   dataPartition = 6,
-}) => {
+}: PreloadOptions): Promise<void> => {
   // ##############
   // Processing
   // ##############
   logger.warn("==> STARTING @streamPreloadingAssets")
-  // 0. Get authHeaders
-  const authHeaders = await getAuthHeaders({
-    user,
-    password,
-  })
 
   // prepare tarball packer
   const injectPath = path.join("inject", `${dataPartition}`)
@@ -71,7 +80,7 @@ const streamPreloadingAssets = async ({
   await streamBaseImage({ pipeStreamFrom: balenaosStream, pipeStreamTo: baseImageStreamEntry })
 
   // get apps.json
-  const appsJson = await getAppsJson({ app_id, release_id }, authHeaders)
+  const appsJson = await getAppsJson({ app_id, release_id })
 
   // extract image_ids from appsJson
   const images = getImageIds({ appsJson, app_id, release_id })
@@ -82,8 +91,8 @@ const streamPreloadingAssets = async ({
       image_name: await getSupervisorImageNameFor({
         version: supervisorVersion,
         arch,
-        api: process.env.API,
-        token: process.env.API_TOKEN,
+        api: env.API,
+        token: env.API_TOKEN,
       }),
       image_hash: "latest",
       isSupervisor: true,
@@ -92,7 +101,8 @@ const streamPreloadingAssets = async ({
   ]
 
   // get manifests from registry for all images including pre-pre-loaded images (the ones inside the base image)
-  const manifests = await getManifests([...baseImages, ...images], authHeaders)
+  const imagesbaseAndPreload = [...baseImages, ...images]
+  const manifests = await getManifests(imagesbaseAndPreload)
 
   // precompute layers metadata for all layers
   const layers = await getLayers(manifests)

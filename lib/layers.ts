@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
-import { default as digestStream } from "digest-stream"
+const digestStream = require("digest-stream")
 import path from "path"
 import { getUrls, getBlob } from "./registry"
 import logger from "../logger"

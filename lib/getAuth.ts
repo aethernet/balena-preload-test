@@ -1,22 +1,13 @@
-interface AuthOptions {
-  user?: string
-  password?: string
-}
+import { env } from 'process';
 
 export interface Auth {
-  auth: {
-    username?: string
-    password?: string
-  }
-  "Docker-Distribution-API-Version": string
+  username: any;
+  password: any;
 }
 
-export const getAuthHeaders = (options: AuthOptions): Auth => {
+export const getAuthHeaders = (): Auth => {
   return {
-    auth: {
-      username: options?.user,
-      password: options?.password,
-    },
-    "Docker-Distribution-API-Version": "registry/2.0",
+    username: env.USER,
+    password: env.PASSWORD
   }
 }

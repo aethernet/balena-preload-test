@@ -1,8 +1,12 @@
 import logger from "../logger"
-import axios, { AxiosRequestConfig } from "axios"
-import dockerParseImage from "docker-parse-image"
+import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios"
+
+// https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
+const dockerParseImage = require("docker-parse-image")
+
+
 import { inspect } from "util"
-import { getAuthHeaders } from "./getAuth"
+import { getAuthHeaders, Auth } from "./getAuth"
 const featureFlags = {
   justDownload: false,
 }
@@ -50,34 +54,31 @@ https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/pa
 https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */
 
-function getRegistryUrl({ registry, namespace }) {
+interface RegistryUrl {
+  registry: string;
+  namespace?: string;
+}
+
+function getRegistryUrl({ registry, namespace }: RegistryUrl): string {
   if (!registry) return `https://registry2.balena-cloud.com/${namespace}/`
   return `https://${registry}/${namespace}/`
 }
 
-/**
- * Download Distribution Manifest
- * @param {[]string} images - array of images
- * @returns {[]json} - array of distribution manifests
- */
-export const getManifests = async (images, auth) => {
-  const manifestsAll = []
-  logger.warn(`== Downloading Manifests @getManifests ==`)
-  for (const key in images) {
-    const { image_name } = images[key]
-    logger.info(`=> ${parseInt(key) + 1} / ${images.length} : ${image_name}`)
-    const manifestInfo = await pullManifestsFromRegistry(image_name, auth)
-    manifestsAll.push({
-      ...manifestInfo,
-      ...images[key],
-    })
-  }
-  return manifestsAll
+
+interface RegistryImageUrl extends RegistryUrl {
+  repository: string;
 }
 
+/**
+ * getImageUrl
+ * @param {string} registry
+ * @param {string} namespace
+ * @param {string} repository
+ * @returns {string} imageUrl
+ */
 // NOTE the double namespace here, the 1st v2 is for docker Version2, the second is for image release Version2
 // Not sure how to get the image rel
-function getImageUrl({ registry, namespace, repository }) {
+function getImageUrl({ registry, namespace, repository }: RegistryImageUrl): string {
   // we're only supporting docker api v2 for now
   return `https://${registry}/v2/${namespace}/${repository}`
 }
@@ -85,29 +86,36 @@ function getImageUrl({ registry, namespace, repository }) {
 /** getAllBlobs
   /v2/<name>/blobs/<digest>
 */
-export const getBlob = async (imageUrl, token, layer) => {
+
+/**
+ * getBlob
+ * @param imageUrl 
+ * @param token 
+ * @param layer 
+ * @returns 
+ */
+export const getBlob = async (imageUrl: string, token: string, layer: { [key: string]: any }): Promise<Object> => {
   const options: AxiosRequestConfig = {
     method: "GET",
     responseType: "stream",
-    // "responseType": 'blob',
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.docker.image.rootfs.diff.tar.gzip",
       "Accept-Encoding": "gzip",
       "Docker-Distribution-API-Version": "registry/2.0",
-      // "content-transfer-encoding": "binary",
     },
     url: `${imageUrl}/blobs/${layer.digest}`,
   }
   try {
     const { data, headers } = await axios(options)
-    if (parseInt(headers["content-length"]) === layer.size && headers["docker-content-digest"] === layer.digest) {
-      // console.log('==> getBlob stream header/layer sizes match', parseInt(headers['content-length']), layer.size);
-      // console.log('==> getBlob stream header/layer digests match', headers['docker-content-digest'], layer.digest);
+    if (parseInt(headers["content-length"], 10) === layer.size && headers["docker-content-digest"] === layer.digest) {
+      logger.debug('==> getBlob stream header/layer sizes match', parseInt(headers['content-length']), layer.size);
+      logger.debug('==> getBlob stream header/layer digests match', headers['docker-content-digest'], layer.digest);
     }
     return data
   } catch (error) {
     console.error("\n\n==> getBlob error:", inspect(error, true, 2, true))
+    throw error
   }
 }
 
@@ -124,10 +132,10 @@ export const getBlob = async (imageUrl, token, layer) => {
  * @param {string} manifest - manifest per image
  * @returns {Promise}
  * */
-async function getAllBlobs(imageUrl, token, manifest) {
+async function getAllBlobs(imageUrl: string, token: string, manifest: { [key: string]: any }): Promise<Object> {
   try {
     const tgzLayersDigest = await Promise.all(
-      manifest.layers.map(async (layer) => {
+      manifest.layers.map(async (layer: { [key: string]: any }) => {
         const dataBlob = await getBlob(imageUrl, token, layer)
         return await dataBlob
       })
@@ -135,15 +143,21 @@ async function getAllBlobs(imageUrl, token, manifest) {
     return tgzLayersDigest
   } catch (error) {
     console.error("\n\n==> getAllBlob error:", inspect(error, true, 2, true))
+    throw error
   }
 }
 
 /**
-  This should pull the blob from the registry after checking head.
-  GET /v2/<name>/blobs/<digest>
-  GET example /v2/53b00bed7a4c6897db23eb0e4cf620e3/blobs/sha256:1aa86408ad62437344cee93c2be884ad802fc63e05795876acec6de0bb21f3cc
-*/
-async function getConfigManifest(imageUrl, token, digest) {
+ * getConfigManifest
+ * This should pull the blob from the registry after checking head.
+ * GET /v2/<name>/blobs/<digest>
+ * GET example /v2/53b00bed7a4c6897db23eb0e4cf620e3/blobs/sha256:1aa86408ad62437344cee93c2be884ad802fc63e05795876acec6de0bb21f3cc
+ * @param imageUrl 
+ * @param token 
+ * @param digest 
+ * @returns 
+ */
+async function getConfigManifest(imageUrl: string, token: string, digest: string): Promise<{ [key: string]: any }> {
   const options = {
     method: "GET",
     url: `${imageUrl}/blobs/${digest}`,
@@ -158,34 +172,45 @@ async function getConfigManifest(imageUrl, token, digest) {
     return await data
   } catch (error) {
     console.error("==> getBlob error", error)
+    throw error
   }
 }
 
 /**
-  GET /v2/<name>/blobs/<digest>
-*/
-async function getHeadBlob(imageUrl, token, digest) {
+ * GET /v2/<name>/blobs/<digest>
+ * @param imageUrl 
+ * @param token 
+ * @param digest 
+ * @returns 
+ */
+async function getHeadBlob(imageUrl: string, token: string, digest: string): Promise<Object> {
   const options = {
     method: "HEAD",
     url: `${imageUrl}/blobs/${digest}`,
     headers: {
       Accept: "application/vnd.docker.distribution.manifest.v2+json",
       Authorization: `Bearer ${token}`,
-
       "Docker-Distribution-API-Version": "registry/2.0",
     },
   }
   try {
     const { data, headers } = await axios(options)
-
-    // Not possible to check `headers['docker-content-digest'] === digest` since cloudfront frontend doesn't forward dockers headers
+    // Not possible to check `headers['docker-content-digest'] === digest` 
+    // since cloudfront frontend doesn't forward dockers headers
     return headers["content-length"] ?? 0
   } catch (error) {
     throw new Error(`==> getHeadBlob CATCH: ${error}`)
   }
 }
 
-async function getManifest(imageUrl, token) {
+/**
+ * 
+ * @param imageUrl 
+ * @param token 
+ * @returns 
+ */
+async function getManifest(imageUrl: string, 
+  token: string): Promise<{ [key: string]: any }> {
   const options = {
     method: "GET",
     url: `${imageUrl}/manifests/latest`,
@@ -194,7 +219,6 @@ async function getManifest(imageUrl, token) {
     headers: {
       Accept: "application/vnd.docker.distribution.manifest.v2+json",
       Authorization: `Bearer ${token}`,
-
       "Docker-Distribution-API-Version": "registry/2.0",
     },
   }
@@ -207,7 +231,18 @@ async function getManifest(imageUrl, token) {
   }
 }
 
-async function getToken(parsedImage, authHeaders, authResponse, tag?) {
+/**
+ * 
+ * @param parsedImage 
+ * @param authHeaders 
+ * @param authResponse 
+ * @param tag 
+ * @returns 
+ */
+async function getToken(parsedImage: { [key: string]: any }, 
+    authHeaders: AxiosBasicCredentials, 
+    authResponse: { [key: string]: any }, 
+    tag?: string) {
   try {
     const { repository, namespace } = parsedImage
     const options = {
@@ -217,7 +252,7 @@ async function getToken(parsedImage, authHeaders, authResponse, tag?) {
         service: authResponse.service,
         scope: `repository:${namespace ? `${namespace}/` : "library/"}${repository}:${tag || "pull"}`,
       },
-      ...authHeaders,
+      auth: authHeaders,
     }
     const { data } = await axios(options)
     if (!data.token) throw new Error("token registry fail.")
@@ -227,13 +262,19 @@ async function getToken(parsedImage, authHeaders, authResponse, tag?) {
   }
 }
 
-async function getRealmResponse(url, authHeaders) {
+/**
+ * 
+ * @param url 
+ * @param authHeaders 
+ * @returns 
+ */
+async function getRealmResponse(url: string, authHeaders: AxiosBasicCredentials) {
   // parse auth response for the realm and service params provided by registry
   let options = {
     method: "GET",
     url,
-    validateStatus: (status) => status === 401,
-    ...authHeaders,
+    validateStatus: (status: number) => status === 401,
+    auth: authHeaders,
   }
   try {
     const { headers } = await axios(options)
@@ -254,16 +295,27 @@ async function getRealmResponse(url, authHeaders) {
   }
 }
 
-export const getUrls = (image, layer?) => {
+/**
+ * 
+ * @param image 
+ * @param layer 
+ * @returns 
+ */
+export const getUrls = (image: string, layer?: string) => {
   const parsedImage = dockerParseImage(image)
   const registryUrl = getRegistryUrl(parsedImage)
   const imageUrl = getImageUrl(parsedImage)
   return { registryUrl, imageUrl, parsedImage }
 }
 
-export const pullManifestsFromRegistry = async (image, auth) => {
-  const authHeaders = auth || (await getAuthHeaders(auth))
-  const { registryUrl, imageUrl, parsedImage } = await getUrls(image)
+/**
+ * 
+ * @param image 
+ * @param auth 
+ * @returns 
+ */
+export const pullManifestsFromRegistry = async (image: string, authHeaders: Auth) => {
+  const { registryUrl, imageUrl, parsedImage } = getUrls(image)
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders)
 
@@ -271,7 +323,7 @@ export const pullManifestsFromRegistry = async (image, auth) => {
 
   const manifest = await getManifest(imageUrl, await token)
   const configDigest = manifest.config.digest
-  const digests = manifest.layers.map((layer) => ({ digest: layer.digest, size: layer.size }))
+  const digests = manifest.layers.map((layer: { [key: string]: string }) => ({ digest: layer.digest, size: layer.size }))
 
   // We are using this manifest as its V2
   const configManifestV2 = await getConfigManifest(imageUrl, await token, configDigest)
@@ -287,4 +339,24 @@ export const pullManifestsFromRegistry = async (image, auth) => {
   return { manifest, digests, configDigest, configManifestV2, image_id, image_name, diff_ids, imageUrl, token }
 }
 
-export { Manifest }
+
+/**
+ * Download Distribution Manifest
+ * @param images - array of images
+ * @returns - array of distribution manifests
+ */
+export const getManifests = async (images: Array<{ [key:string]: any }>): Promise<Array<{[key:string]: any}>> => {
+  const authHeaders = await getAuthHeaders();
+  const manifestsAll = []
+  logger.warn(`== Downloading Manifests @getManifests ==`)
+  for (const image in images) {
+    const imageName = images[image].image_name;
+    logger.info(`=> ${parseInt(image) + 1} / ${images.length} : ${imageName}`)
+    const manifestInfo = await pullManifestsFromRegistry(imageName, authHeaders)
+    manifestsAll.push({
+      ...manifestInfo,
+      ...images[image],
+    })
+  }
+  return manifestsAll
+}
