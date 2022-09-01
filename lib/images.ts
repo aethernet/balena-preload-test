@@ -1,5 +1,3 @@
-import path from "path"
-
 /** Prepare injectable files for all images */
 const getImagesConfigurationFiles = (manifests) => {
   const dockerImageOverlay2Imagedb = "docker/image/overlay2/imagedb"

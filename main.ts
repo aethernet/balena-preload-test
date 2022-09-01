@@ -1,4 +1,4 @@
-import streamPreloadingAssets from "./lib/streamPreloadingAssets.mjs"
+import streamPreloadingAssets from "./lib/streamPreloadingAssets.js"
 import "dotenv/config"
 import fs from "fs-extra"
 
@@ -8,7 +8,7 @@ const balenaosRef = process.env.BALENAOS
 const user = process.env.USER
 const password = process.env.PASSWORD
 const tarball = process.env.TARBALL
-const dataPartition = process.env.DATA_PARTITION
+const dataPartition = parseInt(process.env.DATA_PARTITION, 10)
 const supervisorVersion = process.env.SV_VERSION
 const arch = process.env.ARCH
 const baseImage = process.env.BASEIMAGE

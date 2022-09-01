@@ -1,6 +1,5 @@
 import tar from "tar-stream"
-import path from "path"
-import logger from "../logger.mjs"
+import logger from "../logger.js"
 
 /**
  * PromisePacker
@@ -14,7 +13,7 @@ import logger from "../logger.mjs"
  * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
  * */
-const promisePacker = (pack, injectFolder) => (header, value, cb) =>
+const promisePacker = (pack, injectFolder?) => (header, value, cb?) =>
   new Promise((resolve, reject) => {
     if (header.name.includes("sha256:")) {
       logger.error(`=> FIXME!! pack header.name: ${header.name}`)

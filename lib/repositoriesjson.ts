@@ -11,7 +11,7 @@
  * Which shouldn't have any impact, but is worth noting "au cas où"
  */
 
-import logger from "../logger.mjs"
+import logger from "../logger.js"
 
 /**
  * Relative path of repositories.json as injected in the resin-data partition

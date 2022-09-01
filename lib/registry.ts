@@ -1,8 +1,8 @@
-import logger from "../logger.mjs"
-import axios from "axios"
+import logger from "../logger.js"
+import axios, { AxiosRequestConfig } from "axios"
 import dockerParseImage from "docker-parse-image"
 import { inspect } from "util"
-import { getAuthHeaders } from "./getAuth.mjs"
+import { getAuthHeaders } from "./getAuth.js"
 const featureFlags = {
   justDownload: false,
 }
@@ -86,7 +86,7 @@ function getImageUrl({ registry, namespace, repository }) {
   /v2/<name>/blobs/<digest>
 */
 export const getBlob = async (imageUrl, token, layer) => {
-  const options = {
+  const options: AxiosRequestConfig = {
     method: "GET",
     responseType: "stream",
     // "responseType": 'blob',
@@ -181,7 +181,7 @@ async function getHeadBlob(imageUrl, token, digest) {
     // Not possible to check `headers['docker-content-digest'] === digest` since cloudfront frontend doesn't forward dockers headers
     return headers["content-length"] ?? 0
   } catch (error) {
-    throw new Error("==> getHeadBlob CATCH:", error)
+    throw new Error(`==> getHeadBlob CATCH: ${error}`)
   }
 }
 
@@ -203,11 +203,11 @@ async function getManifest(imageUrl, token) {
     const digest = headers["docker-content-digest"]
     return { ...data, digest }
   } catch (error) {
-    throw new Error("==> NOPE did not get registry manifest. CATCH:", error)
+    throw new Error(`==> NOPE did not get registry manifest. CATCH: ${error}`)
   }
 }
 
-async function getToken(parsedImage, authHeaders, authResponse, tag) {
+async function getToken(parsedImage, authHeaders, authResponse, tag?) {
   try {
     const { repository, namespace } = parsedImage
     const options = {
@@ -223,7 +223,7 @@ async function getToken(parsedImage, authHeaders, authResponse, tag) {
     if (!data.token) throw new Error("token registry fail.")
     return await data.token
   } catch (error) {
-    throw new Error("Failed to get authentication token from registry.", error)
+    throw new Error(`Failed to get authentication token from registry : ${error}`)
   }
 }
 
@@ -254,9 +254,9 @@ async function getRealmResponse(url, authHeaders) {
   }
 }
 
-export const getUrls = (image, layer) => {
+export const getUrls = (image, layer?) => {
   const parsedImage = dockerParseImage(image)
-  const registryUrl = getRegistryUrl(parsedImage, layer)
+  const registryUrl = getRegistryUrl(parsedImage)
   const imageUrl = getImageUrl(parsedImage)
   return { registryUrl, imageUrl, parsedImage }
 }
@@ -269,7 +269,7 @@ export const pullManifestsFromRegistry = async (image, auth) => {
 
   const token = await getToken(parsedImage, authHeaders, authResponseForRealm)
 
-  const manifest = await getManifest(imageUrl, await token, authHeaders)
+  const manifest = await getManifest(imageUrl, await token)
   const configDigest = manifest.config.digest
   const digests = manifest.layers.map((layer) => ({ digest: layer.digest, size: layer.size }))
 

@@ -3,8 +3,8 @@ import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
 import digestStream from "digest-stream"
 import path from "path"
-import { getUrls, getBlob } from "./registry.mjs"
-import logger from "../logger.mjs"
+import { getUrls, getBlob } from "./registry.js"
+import logger from "../logger.js"
 import { inspect } from "util"
 
 /**

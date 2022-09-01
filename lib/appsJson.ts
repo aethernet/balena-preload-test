@@ -26,7 +26,7 @@ const __dirname = path.dirname(__filename)
  * @param {string} release_id - release_id
  * @returns {json} - apps.json object
  */
-const getAppsJson = async ({ app_id, release_id, fleetUUID }, auth) => {
+const getAppsJson = async ({ app_id, release_id }, auth) => {
   //   // FIXME: is fleetUUID equal to app_id ? If not it will be required
   //   // In production those informations should already be available in image-maker
   //   const options = {
