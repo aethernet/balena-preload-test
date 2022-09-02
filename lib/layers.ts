@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
-const digestStream = require("digest-stream")
+import digestStream from "digest-stream"
 import path from "path"
 import { getUrls, getBlob } from "./registry"
 import logger from "../logger"
@@ -225,7 +225,7 @@ const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath
       const { imageUrl } = getUrls(image_name)
 
       // get the stream
-      const layerStream: NodeJS.ReadableStream = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize })
+      const layerStream: any = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize })
 
       // process the stream and get back `size` (uncompressed) and `diff_id` (digest)
       const { size, diff_id }: LayerMeta = await layerStreamProcessing({ layerStream, packStream, cache_id, injectPath })
