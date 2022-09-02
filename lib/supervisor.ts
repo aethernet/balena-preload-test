@@ -27,8 +27,8 @@ import axios from "axios"
 interface supervisorImageNameIn {
   version: string
   arch: string
-  api: string
-  token: string
+  api?: string
+  token?: string
 }
 
 /**
