@@ -1,10 +1,8 @@
 import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
-import digestStream from "digest-stream"
-import path from "path"
+import { digestStream } from "./digestStream"
 import { getUrls, getBlob } from "./registry"
-import logger from "../logger"
 import { inspect } from "util"
 import { Pack, Headers } from "tar-stream"
 
@@ -54,7 +52,7 @@ interface LayerRaw {
  * */
 
 async function getLayers(manifests: any) {
-  logger.warn(`== getting Layers @getLayers ==`)
+  console.log(`== getting Layers @getLayers ==`)
   return manifests
     .map(({ diff_ids, token }: { diff_ids: string[]; token: string }) => {
       // loops on images and compute / generate values all layers
@@ -125,7 +123,7 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
   // compute useful paths
   const dockerOverlay2CacheId = `docker/overlay2/${cache_id}`
   const dockerOverlay2l = "docker/overlay2/l"
-  const dockerImageOverlay2LayerdbSha256 = path.join("docker/image/overlay2/layerdb/sha256")
+  const dockerImageOverlay2LayerdbSha256 = "docker/image/overlay2/layerdb/sha256"
   const dockerImageOverlay2LayerdbSha256ChainId = `${dockerImageOverlay2LayerdbSha256}/${chain_id}`
 
   const files = [
@@ -209,7 +207,7 @@ interface ProcessLayerIn {
 }
 
 const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath }: ProcessLayerIn) => {
-  logger.warn(`== Processing Layers @downloadProcessLayers ==`)
+  console.log(`== Processing Layers @downloadProcessLayers ==`)
 
   const processingLayers = getLayerDistributionDigests(manifests)
   const injectableFiles = []
@@ -238,7 +236,7 @@ const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath
         injectableFiles.push(generateFilesForLayer({ ...layer, size, cache_id }))
       }
     } catch (error) {
-      logger.error("downloadProcessLayers CATCH", error)
+      console.log("downloadProcessLayers CATCH", error)
     }
   }
   return injectableFiles.flat()
@@ -284,7 +282,7 @@ async function layerStreamProcessing({ layerStream, packStream, cache_id, inject
       layerMeta.size = length
     }
 
-    const digester = digestStream("sha256", "hex", digesterCb)
+    const digester = digestStream(digesterCb)
 
     // 4. tar extracted happens here
     extract.on("entry", (header: Headers & { pax: any }, stream: NodeJS.ReadableStream) => {
@@ -293,7 +291,7 @@ async function layerStreamProcessing({ layerStream, packStream, cache_id, inject
          * DELETE header.pax here, if it exists, as it is causing problems with the symlink handling.
          * header.pax overrides over the from/to name path for the symlinks so ends up at root level
          */
-        logger.debug(`=> @layerStreamProcessing header ${inspect(header, true, 2, true)}`)
+        console.log(`=> @layerStreamProcessing header ${inspect(header, true, 2, true)}`)
         delete header.pax
       }
 
