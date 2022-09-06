@@ -1,7 +1,7 @@
-import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios"
+import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios";
 
 // https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
-const dockerParseImage = require("docker-parse-image")
+import { dockerParseImage, DockerParsedImage } from "./docker-parse-image";
 
 import { inspect } from "util"
 // const featureFlags = {
@@ -51,18 +51,9 @@ https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/pa
 https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */
 
-interface RegistryUrl {
-  registry: string
-  namespace?: string
-}
-
-function getRegistryUrl({ registry, namespace }: RegistryUrl): string {
+function getRegistryUrl({ registry, namespace }: DockerParsedImage | any = null): string {
   if (!registry) return `https://registry2.balena-cloud.com/${namespace}/`
   return `https://${registry}/${namespace}/`
-}
-
-interface RegistryImageUrl extends RegistryUrl {
-  repository: string
 }
 
 /**
@@ -74,7 +65,7 @@ interface RegistryImageUrl extends RegistryUrl {
  */
 // NOTE the double namespace here, the 1st v2 is for docker Version2, the second is for image release Version2
 // Not sure how to get the image rel
-function getImageUrl({ registry, namespace, repository }: RegistryImageUrl): string {
+function getImageUrl({ registry, namespace, repository }: DockerParsedImage | any = null): string {
   // we're only supporting docker api v2 for now
   return `https://${registry}/v2/${namespace}/${repository}`
 }
@@ -90,7 +81,7 @@ function getImageUrl({ registry, namespace, repository }: RegistryImageUrl): str
  * @param layer
  * @returns
  */
-export const getBlob = async (imageUrl: string, token: string, layer: { [key: string]: any }): Promise<Object> => {
+export async function getBlob(imageUrl: string, token: string, layer: { [key: string]: any }): Promise<Object> {
   const options: AxiosRequestConfig = {
     method: "GET",
     responseType: "stream",
@@ -234,7 +225,7 @@ async function getManifest(imageUrl: string, token: string): Promise<{ [key: str
  * @param tag
  * @returns
  */
-async function getToken(parsedImage: { [key: string]: any }, authHeaders: AxiosBasicCredentials, authResponse: { [key: string]: any }, tag?: string) {
+async function getToken(parsedImage: DockerParsedImage | any = null, authHeaders: AxiosBasicCredentials, authResponse: { [key: string]: any }, tag?: string) {
   try {
     const { repository, namespace } = parsedImage
     const options = {
@@ -293,7 +284,7 @@ async function getRealmResponse(url: string, authHeaders: AxiosBasicCredentials)
  * @param layer
  * @returns
  */
-export const getUrls = (image: string) => {
+export function getUrls(image: string) {
   const parsedImage = dockerParseImage(image)
   const registryUrl = getRegistryUrl(parsedImage)
   const imageUrl = getImageUrl(parsedImage)
@@ -306,7 +297,7 @@ export const getUrls = (image: string) => {
  * @param auth
  * @returns
  */
-export const pullManifestsFromRegistry = async (image: string, authHeaders: AxiosBasicCredentials) => {
+export async function pullManifestsFromRegistry(image: string, authHeaders: AxiosBasicCredentials) {
   const { registryUrl, imageUrl, parsedImage } = getUrls(image)
 
   const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders)
