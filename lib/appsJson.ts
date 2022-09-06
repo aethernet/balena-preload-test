@@ -1,5 +1,3 @@
-import logger from "../logger"
-
 /**
  * `Apps.json` is the file that will inform the supervisor of what's has been preloaded, which services should be started and with which config.
  *
@@ -10,8 +8,7 @@ import logger from "../logger"
  */
 
 // import logger from "../logger.mjs"
-import path from "path"
-import fs from "fs-extra"
+import { readJson } from "fs-extra"
 
 /**
  * Derives Apps.json from target state obtained from the api
@@ -24,6 +21,8 @@ import fs from "fs-extra"
  * @returns {json} - apps.json object
  */
 const getAppsJson = async ({ app_id, release_id }: any) => {
+  console.log(app_id)
+  console.log(release_id)
   //   // FIXME: is fleetUUID equal to app_id ? If not it will be required
   //   // In production those informations should already be available in image-maker
   //   const options = {
@@ -43,7 +42,7 @@ const getAppsJson = async ({ app_id, release_id }: any) => {
   //   }
   // }
 
-  return await fs.readJson(path.join(__dirname, "..", "in", "apps.json"))
+  return await readJson("../in/apps.json")
 }
 
 /**
@@ -65,7 +64,7 @@ interface Image {
 const getImageIds = ({ appsJson, app_id, release_id }: ImageIdsInput): Image[] => {
   const appId = app_id ?? Object.keys(appsJson.apps)[0]
   const releaseId = release_id ?? Object.keys(appsJson.apps?.[appId]?.releases)[0]
-  logger.warn(`==> appId: ${appId} & releaseId: ${releaseId}`)
+  console.log(`==> appId: ${appId} & releaseId: ${releaseId}`)
   const imageKeys = Object.keys(appsJson.apps?.[appId]?.releases?.[releaseId]?.services)
   const imageNames = imageKeys.map((key) => appsJson.apps?.[appId]?.releases?.[releaseId]?.services[key].image)
   return imageNames.map((image) => {

@@ -11,8 +11,6 @@
  * Which shouldn't have any impact, but is worth noting "au cas où"
  */
 
-import logger from "../logger"
-
 /**
  * Relative path of repositories.json as injected in the resin-data partition
  * On a running device it would be /var/lib/docker/image/overlay2/repositories.json
@@ -41,7 +39,7 @@ const createAllRepositoriesFragments = (manifests: any) => {
         [`balena_supervisor:${supervisorVersion}`]: image_id,
       }
   }
-  logger.info("==> @createAllRepositoriesFragments repositories")
+  console.log("==> @createAllRepositoriesFragments repositories")
   return repositories
 }
 
@@ -51,14 +49,14 @@ const createAllRepositoriesFragments = (manifests: any) => {
  * @param {JSON} repositoriesJson - origal repositories.json
  */
 const buildRepositories = ({ manifests }: any) => {
-  logger.warn("== Build Repositories @buildRepositories ==")
+  console.log("== Build Repositories @buildRepositories ==")
 
   // generate repositories fragments for preloaded images
   const repositories = {
     Repositories: createAllRepositoriesFragments(manifests),
   }
 
-  logger.debug("repositories.json", repositories)
+  console.log("repositories.json", repositories)
 
   return repositories
 }

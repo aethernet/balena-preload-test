@@ -1,5 +1,4 @@
 import tar, { Pack, Headers } from "tar-stream"
-import logger from "../logger"
 
 /**
  * PromisePacker
@@ -16,7 +15,7 @@ import logger from "../logger"
 const promisePacker = (pack: Pack, injectFolder?: string) => (header: Headers, value: any) =>
   new Promise((resolve, reject) => {
     if (header.name.includes("sha256:")) {
-      logger.error(`=> FIXME!! pack header.name: ${header.name}`)
+      console.log(`=> FIXME!! pack header.name: ${header.name}`)
     }
     // add the root injectable folder in front of the name when injecting files
     if (injectFolder) header.name = `${injectFolder}/${header.name}`

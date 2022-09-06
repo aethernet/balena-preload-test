@@ -1,5 +1,3 @@
-import path from "path"
-import { env } from 'process';
 import { getManifests } from "./registry"
 import { buildRepositories, repositoriesJsonInjectionPath } from "./repositoriesjson"
 import { streamBaseImage } from "./baseImage"
@@ -8,22 +6,22 @@ import { getLayers, downloadProcessLayers } from "./layers"
 import { promisePacker, getTarballStream } from "./packer"
 import { getImagesConfigurationFiles } from "./images"
 import { getSupervisorImageNameFor } from "./supervisor"
-import logger from "../logger"
 
 interface PreloadOptions {
   outputStream: NodeJS.WritableStream
   balenaosStream: NodeJS.ReadableStream
   balenaosSize: number
-  balenaos: string
   app_id: string
   release_id: string
   api: string
   token: string
   arch: string
-  output: string
   balenaosRef: string
   dataPartition: number
   supervisorVersion: string
+  user: string
+  password: string
+  callback?: Function
 }
 
 /**
@@ -43,14 +41,19 @@ const streamPreloadingAssets = async ({
   release_id,
   balenaosRef,
   dataPartition = 6,
+  api,
+  token,
+  user,
+  password,
+  callback,
 }: PreloadOptions): Promise<void> => {
   // ##############
   // Processing
   // ##############
-  logger.warn("==> STARTING @streamPreloadingAssets")
+  console.log("==> STARTING @streamPreloadingAssets")
 
   // prepare tarball packer
-  const injectPath = path.join("inject", `${dataPartition}`)
+  const injectPath = `inject/${dataPartition}`
   const packStream = getTarballStream(outputStream) // streamable
   const packFile = promisePacker(packStream, injectPath) // promise
   const packManifest = promisePacker(packStream) // promise
@@ -91,8 +94,8 @@ const streamPreloadingAssets = async ({
       image_name: await getSupervisorImageNameFor({
         version: supervisorVersion,
         arch,
-        api: env.API,
-        token: env.API_TOKEN,
+        api,
+        token,
       }),
       image_hash: "latest",
       isSupervisor: true,
@@ -102,7 +105,7 @@ const streamPreloadingAssets = async ({
 
   // get manifests from registry for all images including pre-pre-loaded images (the ones inside the base image)
   const imagesbaseAndPreload = [...baseImages, ...images]
-  const manifests = await getManifests(imagesbaseAndPreload)
+  const manifests = await getManifests(imagesbaseAndPreload, user, password)
 
   // precompute layers metadata for all layers
   const layers = await getLayers(manifests)
@@ -135,8 +138,10 @@ const streamPreloadingAssets = async ({
 
   // close tarball
   packStream.finalize()
-  logger.warn("==> FINISHED @streamPreloadingAssets")
-  logger.verbose("==> change consoleLevel log levels in logger.mjs for less verbose logging")
+  console.log("==> FINISHED @streamPreloadingAssets")
+  console.log("==> change consoleLevel log levels in logger.mjs for less verbose logging")
+
+  if (callback) callback()
 }
 
-export default streamPreloadingAssets
+export { streamPreloadingAssets }

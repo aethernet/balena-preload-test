@@ -2,8 +2,6 @@
  * Get the base image we're going to preload assets in (balenaos.img)
  * */
 
-import logger from "../logger"
-
 interface StreamBaseImageIn {
   pipeStreamFrom: NodeJS.ReadableStream
   pipeStreamTo: NodeJS.WritableStream
@@ -14,13 +12,13 @@ interface StreamBaseImageIn {
  */
 const streamBaseImage = ({ pipeStreamFrom, pipeStreamTo }: StreamBaseImageIn): Promise<boolean> =>
   new Promise((resolve, reject) => {
-    logger.warn("== Start streaming base image (balenaOs) @streamBaseImage ==")
+    console.log("== Start streaming base image (balenaOs) @streamBaseImage ==")
 
     pipeStreamFrom.pipe(pipeStreamTo)
 
     pipeStreamFrom.on("end", function () {
       // we're good we can continue the process
-      logger.warn("== End of base image streaming (balenaOs) @streamBaseImage ==")
+      console.log("== End of base image streaming (balenaOs) @streamBaseImage ==")
       resolve(true)
     })
 
