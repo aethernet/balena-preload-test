@@ -3,7 +3,7 @@
  * https://github.com/mafintosh/docker-parse-image/blob/master/index.js
  */
 
-export interface DockerParsedImage {
+ export interface DockerParsedImage {
   registry: string,
   namespace?: any,
   repository: string,
@@ -12,33 +12,37 @@ export interface DockerParsedImage {
   fullname: string,
 }
 
-export function dockerParseImage(image:any){
-    var match = image.match(/^(?:([^\/]+)\/)?(?:([^\/]+)\/)?([^@:\/]+)(?:[@:](.+))?$/);
-    if (!match) return null;
+const dockerParseImage = (image:any) => {
+    if (!image) return null
+    const registryArray = image.split('/')
+
+    let registry = registryArray[0];
+    let namespace = registryArray[1];
+    const repository = registryArray[2].split('@')[0];
+    let tag = registryArray[2].split('@')[1];
   
-    var registry = match[1];
-    var namespace = match[2];
-    var repository = match[3];
-    var tag = match[4];
-  
-    if (!namespace && registry && !/[:.]/.test(registry)) {
-      namespace = registry;
-      registry = null;
+    if (!namespace && registry && !registry.includes(':') && !registry.includes('.')) {
+      namespace = registry
+      registry = null
     }
+
+    registry = registry ? `${registry}/` : ''
+    namespace = namespace && namespace !== 'library' ? `${namespace}/` : ''
+    tag = tag && tag !== 'latest' ? `:${tag}` : ''
   
-    registry = registry ? registry+'/' : '';
-    namespace = namespace && namespace !== 'library' ? namespace+'/' : '';
-    tag = tag && tag !== 'latest' ? ':'+tag : '';
+    const name = `${registry}${namespace}${repository}${tag}`
+    const fullname = `${registry}${(namespace || 'library/')}${repository}${(tag || ':latest')}`
   
-    const name = `${registry}${namespace}${repository}${tag}`;
-    const fullname = `${registry}${namespace || 'library/'}${repository}${tag || ':latest'}`;
-  
-    return {
-        registry,
-        namespace: namespace || null,
-        repository,
-        tag: tag || null,
-        name,
-        fullname,
-    };
-}
+    const result = {
+      registry: registry || null,
+      namespace: namespace || null,
+      repository: repository || null,
+      tag: tag || null,
+      name,
+      fullname,
+    }
+
+    return result
+  }
+
+export { dockerParseImage }
