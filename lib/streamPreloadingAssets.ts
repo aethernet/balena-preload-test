@@ -11,14 +11,14 @@ interface PreloadOptions {
   outputStream: NodeJS.WritableStream
   balenaosStream: NodeJS.ReadableStream
   balenaosSize: number
-  app_id: string
-  release_id: string
+  app_id: any
+  release_id: any
   api: string
   token: string
-  arch: string
-  balenaosRef: string
-  dataPartition: number
-  supervisorVersion: string
+  arch: any
+  balenaosRef: any
+  dataPartition: any
+  supervisorVersion: any
   user: string
   password: string
   callback?: Function
