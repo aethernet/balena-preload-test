@@ -6,23 +6,35 @@ import { getLayers, downloadProcessLayers } from "./layers"
 import { promisePacker, getTarballStream } from "./packer"
 import { getImagesConfigurationFiles } from "./images"
 import { getSupervisorImageNameFor } from "./supervisor"
+import AppsJsonSchema from "./apps-json-interface"
 
-interface PreloadOptions {
+export interface PreloadIds  {
+  app_id: string;
+  release_id: string;
+}
+
+export interface AppsJsonProp extends PreloadIds {
+  appsJson: AppsJsonSchema; 
+}
+
+export interface PreloadOptions extends AppsJsonProp {
   outputStream: NodeJS.WritableStream
   balenaosStream: NodeJS.ReadableStream
   balenaosSize: number
-  app_id: any
-  release_id: any
   api: string
   token: string
-  arch: any
-  balenaosRef: any
-  dataPartition: any
-  supervisorVersion: any
+  arch: string
+  balenaosRef: string
+  dataPartition: number
+  supervisorVersion: string
   user: string
   password: string
-  callback?: Function
+  callback?: Function | undefined
 }
+
+// export interface ImageIdsInput {
+//   appsJson: AppsJsonSchema; 
+// }
 
 /**
  * Main Processing function

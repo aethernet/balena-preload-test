@@ -9,6 +9,7 @@
 
 // import logger from "../logger.mjs"
 import { readJson } from "fs-extra"
+import { PreloadIds, AppsJsonProp } from "./streamPreloadingAssets"
 
 /**
  * Derives Apps.json from target state obtained from the api
@@ -20,7 +21,7 @@ import { readJson } from "fs-extra"
  * @param {string} release_id - release_id
  * @returns {json} - apps.json object
  */
-const getAppsJson = async ({ app_id, release_id }: any) => {
+const getAppsJson = async ({ app_id, release_id }: PreloadIds) => {
   console.log(app_id)
   console.log(release_id)
   //   // FIXME: is fleetUUID equal to app_id ? If not it will be required
@@ -50,18 +51,15 @@ const getAppsJson = async ({ app_id, release_id }: any) => {
  * If apps_id and/or release_id is unkown it will return first.
  * // TODO: return all instead of first when no app or release is specified.
  */
-interface ImageIdsInput {
-  appsJson: any //TODO: get propertype for appsJson V3
-  app_id: string
-  release_id: string
-}
+
+
 
 interface Image {
   image_name: string
   image_hash: string
 }
 
-const getImageIds = ({ appsJson, app_id, release_id }: ImageIdsInput): Image[] => {
+const getImageIds = ({ app_id, release_id, appsJson }: AppsJsonProp): Image[] => {
   const appId = app_id ?? Object.keys(appsJson.apps)[0]
   const releaseId = release_id ?? Object.keys(appsJson.apps?.[appId]?.releases)[0]
   console.log(`==> appId: ${appId} & releaseId: ${releaseId}`)

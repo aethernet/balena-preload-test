@@ -1,7 +1,6 @@
 import { streamPreloadingAssets } from "./lib/streamPreloadingAssets"
 import "dotenv/config"
 import fsx from "fs-extra"
-// import osfs from "fs"
 
 const app_id = process.env.APPID
 const release_id = process.env.RELEASEID
@@ -20,7 +19,7 @@ const password = process.env.PASSWORD
  * Get balenaos size
  * @returns image size
  */
-const getImageSize = (filePath: any) => {
+const getImageSize = (filePath: string) => {
   const { size } = fsx.statSync(filePath)
   return size
 }
