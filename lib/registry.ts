@@ -4,9 +4,10 @@ import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios";
 import { dockerParseImage, DockerParsedImage } from "./docker-parse-image";
 
 import { inspect } from "util"
-// const featureFlags = {
-//   justDownload: false,
-// }
+
+const featureFlags = {
+  testRegistry: true,
+}
 /**
   This should authenticate to the registry api, get a token,
   Get the distribution manifest, the manifest from the registry and get the blobs.
@@ -81,7 +82,7 @@ function getImageUrl({ registry, namespace, repository }: DockerParsedImage | an
  * @param layer
  * @returns
  */
-export async function getBlob(imageUrl: string, token: string, layer: { [key: string]: any }): Promise<Object> {
+export async function getBlob(imageUrl: string, token: string, layer: { [key: string]: number | string }): Promise<Object> {
   const options: AxiosRequestConfig = {
     method: "GET",
     responseType: "stream",
@@ -144,7 +145,10 @@ export async function getBlob(imageUrl: string, token: string, layer: { [key: st
  * @param digest
  * @returns
  */
-async function getConfigManifest(imageUrl: string, token: string, digest: string): Promise<{ [key: string]: any }> {
+async function getConfigManifest(
+  imageUrl: string, 
+  token: string, 
+  digest: string): Promise<{ [key: string]: any }> {
   const options = {
     method: "GET",
     url: `${imageUrl}/blobs/${digest}`,
@@ -340,4 +344,11 @@ export const getManifests = async (images: Array<{ [key: string]: any }>, user: 
     })
   }
   return manifestsAll
+}
+
+if (featureFlags.testRegistry) {
+  const imageName = process.env.IMAGE;
+  const user = process.env.USER;
+  const password = process.env.TOKEN;
+  const manifestInfo = pullManifestsFromRegistry(imageName, { username: user, password })
 }
