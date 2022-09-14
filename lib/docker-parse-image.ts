@@ -4,15 +4,15 @@
  */
 
  export interface DockerParsedImage {
-  registry: string,
-  namespace?: any,
-  repository: string,
-  tag?: any,
+  registry: string|null,
+  namespace?: string|null,
+  repository: string|null,
+  tag?: string|null,
   name: string,
   fullname: string,
 }
 
-const dockerParseImage = (image:any) => {
+const dockerParseImage = (image:string) => {
     if (!image) return null
     const registryArray = image.split('/')
 
@@ -23,7 +23,7 @@ const dockerParseImage = (image:any) => {
   
     if (!namespace && registry && !registry.includes(':') && !registry.includes('.')) {
       namespace = registry
-      registry = null
+      registry = ''
     }
 
     registry = registry ? `${registry}/` : ''

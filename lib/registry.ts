@@ -52,6 +52,34 @@ https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/pa
 https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */
 
+
+export interface Manifest {
+  schemaVersion: number;
+  mediaType: string;
+  config: {
+    mediaType: string;
+    size: number;
+    digest: string;
+  };
+  diffIds: ManifestDigests[];
+  // layers: ManifestLayers[];
+  token: string;
+}
+
+export interface ManifestDigests {
+  // split(arg0: string): unknown;
+  mediaType: string;
+  size: number;
+  digest: string;
+  // diffId: string;
+}
+
+/**
+ * 
+ * @param {string} registry
+ * @param {string} namespace
+ * @returns 
+ */
 function getRegistryUrl({ registry, namespace }: DockerParsedImage | any = null): string {
   if (!registry) return `https://registry2.balena-cloud.com/${namespace}/`
   return `https://${registry}/${namespace}/`
