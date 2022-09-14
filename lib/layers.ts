@@ -2,7 +2,7 @@ import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
 import { digestStream } from "./digestStream"
-import { getUrls, getBlob } from "./registry"
+import { getUrls, getBlob, Manifest, ManifestDigests } from "./registry"
 import { inspect } from "util"
 import { Pack, Headers } from "tar-stream"
 
@@ -14,6 +14,8 @@ interface LayerMeta {
 interface Layer {
   diff_id: string
   chain_id: string
+  diffId: string | number | null
+  chainId: string
   isDuplicate: boolean
   token: string
   parent: string | null
@@ -26,6 +28,11 @@ interface Layer {
 interface LayerRaw {
   size: number
   digest: string
+}
+
+interface Manifests {
+  manifest: Manifest[]
+  image: string
 }
 
 /**
@@ -51,27 +58,28 @@ interface LayerRaw {
  * @param {[Object]} manifests - array of image config manifests
  * */
 
-async function getLayers(manifests: any) {
+async function getLayers(manifests: Manifest[]) {
   console.log(`== getting Layers @getLayers ==`)
   return manifests
-    .map(({ diff_ids, token }: { diff_ids: string[]; token: string }) => {
+    .map(({ diffIds, token }: Manifest) => {
       // loops on images and compute / generate values all layers
       // use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
       // note : we'll generate `cache_id` later when processing the layer and link back then
       const computedLayers: Layer[] = []
-      for (const key in diff_ids) {
-        const diff_id = diff_ids[parseInt(key)]
-        const chain_id =
-          parseInt(key) == 0 ? diff_id.split(":")[1] : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chain_id, diff_id })
-        const duplicateOf = computedLayers.find((layer) => layer.chain_id === chain_id)
+      for (const key in diffIds) {
+        const diffId: any = diffIds[parseInt(key)]
+        const chainId = parseInt(key) == 0 
+          ? diffId.split(":")[1] 
+          : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chainId, diffId })
+        const duplicateOf = computedLayers.find((layer) => layer.chain_id === chainId)
         computedLayers.push({
           token,
-          diff_id,
-          chain_id,
+          diffId,
+          chainId,
           parent: parseInt(key) > 0 ? computedLayers[parseInt(key) - 1].chain_id : null,
           isDuplicate: Boolean(duplicateOf),
           link: duplicateOf ? duplicateOf.link : crypto.randomBytes(13).toString("hex").toUpperCase(),
-        })
+        } as Layer)
       }
       return computedLayers
     })
@@ -95,7 +103,7 @@ async function getLayers(manifests: any) {
  * @param {[Object]} manifests - array of distribution manifests with auth
  * @return {[Object]} layerUrls - array of layers blob digests with athentication token
  */
-const getLayerDistributionDigests = (manifests: any) => {
+const getLayerDistributionDigests = (manifests: Manifest[]) => {
   return manifests
     .map(({ manifest, image_name, token }: any) =>
       manifest.layers.map((layer: LayerRaw) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
@@ -200,7 +208,7 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
  */
 
 interface ProcessLayerIn {
-  manifests: any[]
+  manifests: Manifest[]
   layers: Layer[]
   packStream: Pack
   injectPath: string
@@ -244,7 +252,7 @@ const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath
 
 interface ComputeChainInput {
   previousChainId: string
-  diff_id: string
+  diffId: string
 }
 /** Compute Chain Id
  *
