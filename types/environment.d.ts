@@ -8,17 +8,18 @@ declare global {
         RELEASEID: string
         BALENAOS: string
         USER: string
-        PASSWORD?: any
+        PASSWORD: string
         TARBALL: string
         BALENAENV: string
         DEVICEADDRESS: string
         CONSOLELEVEL: string
         DATA_PARTITION: string
         API: string
-        API_TOKEN?: string
+        API_TOKEN: string
         SV_VERSION: string
         ARCH: string
         BASEIMAGE: string
+        IMAGE: string
       }
     }
   }

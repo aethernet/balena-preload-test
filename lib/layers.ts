@@ -2,7 +2,8 @@ import crypto from "crypto"
 import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
 import { digestStream } from "./digestStream"
-import { getUrls, getBlob, Manifest, ManifestDigests } from "./registry"
+import { getUrls, getBlob } from "./registry"
+import { Manifest, ManifestConfig, ManifestInfosFromRegistry, MediaType } from "./interface-manifest"
 import { inspect } from "util"
 import { Pack, Headers } from "tar-stream"
 
@@ -11,7 +12,7 @@ interface LayerMeta {
   diff_id: string | null
 }
 
-interface Layer {
+interface Layer extends ManifestConfig, LayerMeta {
   diff_id: string
   chain_id: string
   diffId: string | number | null
@@ -20,8 +21,8 @@ interface Layer {
   token: string
   parent: string | null
   link: string
-  lower?: string
-  size?: number
+  lower?: string | null
+  // size?: number
   cache_id?: string
 }
 
@@ -30,10 +31,7 @@ interface LayerRaw {
   digest: string
 }
 
-interface Manifests {
-  manifest: Manifest[]
-  image: string
-}
+
 
 /**
  * Precompute _Layers_ array
@@ -58,16 +56,16 @@ interface Manifests {
  * @param {[Object]} manifests - array of image config manifests
  * */
 
-async function getLayers(manifests: Manifest[]) {
-  console.log(`== getting Layers @getLayers ==`)
-  return manifests
-    .map(({ diffIds, token }: Manifest) => {
+async function getLayers(manifestsAll: ManifestInfosFromRegistry[]) {
+  console.log(`== getting Layers @getLayers == ${manifestsAll}`)
+  return manifestsAll
+    .map(({ diffIds, token }) => {
       // loops on images and compute / generate values all layers
       // use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
       // note : we'll generate `cache_id` later when processing the layer and link back then
       const computedLayers: Layer[] = []
-      for (const key in diffIds) {
-        const diffId: any = diffIds[parseInt(key)]
+      for (const key in  diffIds) {
+        const diffId: any =  diffIds[parseInt(key)] //TODO: fix this type, why does this think its manifestDigest
         const chainId = parseInt(key) == 0 
           ? diffId.split(":")[1] 
           : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chainId, diffId })
@@ -103,7 +101,7 @@ async function getLayers(manifests: Manifest[]) {
  * @param {[Object]} manifests - array of distribution manifests with auth
  * @return {[Object]} layerUrls - array of layers blob digests with athentication token
  */
-const getLayerDistributionDigests = (manifests: Manifest[]) => {
+const getLayerDistributionDigests = (manifests: ManifestInfosFromRegistry[]) => {
   return manifests
     .map(({ manifest, image_name, token }: any) =>
       manifest.layers.map((layer: LayerRaw) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
@@ -208,7 +206,7 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
  */
 
 interface ProcessLayerIn {
-  manifests: Manifest[]
+  manifests: ManifestInfosFromRegistry[];
   layers: Layer[]
   packStream: Pack
   injectPath: string
@@ -260,8 +258,8 @@ interface ComputeChainInput {
  * i.e. sha256("sha256:e265835b28ac16782ef429b44427c7a72cdefc642794515d78a390a72a2eab42 sha256:573a4eb582cc8a741363bc2f323baf020649960822435922c50d956e1b22a787")
  *
  */
-const computeChainId = ({ previousChainId, diff_id }: ComputeChainInput): string =>
-  crypto.createHash("sha256").update(`sha256:${previousChainId} ${diff_id}`).digest("hex")
+const computeChainId = ({ previousChainId, diffId }: ComputeChainInput): string =>
+  crypto.createHash("sha256").update(`sha256:${previousChainId} ${diffId}`).digest("hex")
 
 interface LayerStreamInput {
   layerStream: NodeJS.ReadableStream

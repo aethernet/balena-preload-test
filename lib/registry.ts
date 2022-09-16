@@ -1,13 +1,15 @@
 import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios";
-
+import "dotenv/config"
+import { env } from "process"
 // https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
 import { dockerParseImage, DockerParsedImage } from "./docker-parse-image";
-
+import { Manifest, ManifestsAll, ManifestInfosFromRegistry, ConfigManifestV2 } from "./interface-manifest"
 import { inspect } from "util"
 
 const featureFlags = {
   testRegistry: true,
 }
+
 /**
   This should authenticate to the registry api, get a token,
   Get the distribution manifest, the manifest from the registry and get the blobs.
@@ -52,27 +54,6 @@ https://github.com/plurid/hypod/blob/c69c53ef8c9aa41741144b416d2109c55a5eb7e1/pa
 https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
 */
 
-
-export interface Manifest {
-  schemaVersion: number;
-  mediaType: string;
-  config: {
-    mediaType: string;
-    size: number;
-    digest: string;
-  };
-  diffIds: ManifestDigests[];
-  // layers: ManifestLayers[];
-  token: string;
-}
-
-export interface ManifestDigests {
-  // split(arg0: string): unknown;
-  mediaType: string;
-  size: number;
-  digest: string;
-  // diffId: string;
-}
 
 /**
  * 
@@ -163,6 +144,8 @@ export async function getBlob(imageUrl: string, token: string, layer: { [key: st
 //   }
 // }
 
+
+
 /**
  * getConfigManifest
  * This should pull the blob from the registry after checking head.
@@ -176,7 +159,7 @@ export async function getBlob(imageUrl: string, token: string, layer: { [key: st
 async function getConfigManifest(
   imageUrl: string, 
   token: string, 
-  digest: string): Promise<{ [key: string]: any }> {
+  digest: string): Promise<ConfigManifestV2> {
   const options = {
     method: "GET",
     url: `${imageUrl}/blobs/${digest}`,
@@ -228,7 +211,7 @@ async function getConfigManifest(
  * @param token
  * @returns
  */
-async function getManifest(imageUrl: string, token: string): Promise<{ [key: string]: any }> {
+async function getManifest(imageUrl: string, token: string): Promise<Manifest> {
   const options = {
     method: "GET",
     url: `${imageUrl}/manifests/latest`,
@@ -241,10 +224,10 @@ async function getManifest(imageUrl: string, token: string): Promise<{ [key: str
     },
   }
   try {
-    const { data, headers } = await axios(options)
-    const digest = headers["docker-content-digest"]
-    return { ...data, digest }
+    const { data } = await axios(options)
+    return data;
   } catch (error) {
+    console.error("==> getManifest error", error)
     throw new Error(`==> NOPE did not get registry manifest. CATCH: ${error}`)
   }
 }
@@ -277,13 +260,18 @@ async function getToken(parsedImage: DockerParsedImage | any = null, authHeaders
   }
 }
 
+interface AuthRealmServiceResponseType {
+  realm: string;
+  service: string;
+}
+
 /**
  *
  * @param url
  * @param authHeaders
  * @returns
  */
-async function getRealmResponse(url: string, authHeaders: AxiosBasicCredentials) {
+async function getRealmResponse(url: string, authHeaders: AxiosBasicCredentials): Promise<AuthRealmServiceResponseType> {
   // parse auth response for the realm and service params provided by registry
   let options = {
     method: "GET",
@@ -300,12 +288,13 @@ async function getRealmResponse(url: string, authHeaders: AxiosBasicCredentials)
     // `Bearer realm="https://api.balena-cloud.com/auth/v1/token"
     // ,service="registry2.balena-cloud.com.bob.local"`
     const authHeader = headers["www-authenticate"].split(" ")[1].split(",")
-    const authResponse = {
+    const authRealmServiceResponse = {
       realm: authHeader[0].split("=")[1].replace(/\"/g, ""),
       service: authHeader[1].split("=")[1].replace(/\"/g, ""),
     }
-    return authResponse
+    return authRealmServiceResponse
   } catch (error) {
+    console.error("==> getRealmResponse error", error);
     throw new Error(`www-authenticate Bearer realm/service missing. ERROR: ${error}`)
   }
 }
@@ -329,29 +318,30 @@ export function getUrls(image: string) {
  * @param auth
  * @returns
  */
-export async function pullManifestsFromRegistry(image: string, authHeaders: AxiosBasicCredentials) {
+export async function pullManifestsFromRegistry(image: string, authHeaders: AxiosBasicCredentials): Promise<ManifestInfosFromRegistry> {
   const { registryUrl, imageUrl, parsedImage } = getUrls(image)
 
-  const authResponseForRealm = await getRealmResponse(registryUrl, authHeaders)
+  const authRealmServiceResponse = await getRealmResponse(registryUrl, authHeaders)
 
-  const token = await getToken(parsedImage, authHeaders, authResponseForRealm)
+  const token = await getToken(parsedImage, authHeaders, authRealmServiceResponse)
 
   const manifest = await getManifest(imageUrl, await token)
-  const configDigest = manifest.config.digest
-  const digests = manifest.layers.map((layer: { [key: string]: string }) => ({ digest: layer.digest, size: layer.size }))
+  console.log("==> manifest", inspect(manifest, true,10,true))
+  const configDigest = manifest?.config?.digest
+  const digests = manifest?.layers;
 
   // We are using this manifest as its V2
   const configManifestV2 = await getConfigManifest(imageUrl, await token, configDigest)
-  const diff_ids = await configManifestV2.rootfs.diff_ids
+  const diffIds = await configManifestV2.rootfs.diff_ids
 
   // if (featureFlags.justDownload) {
   //   const allBlobAlltheTime = await getAllBlobs(imageUrl, await token, manifest)
   // }
 
-  const image_id = configDigest
-  const image_name = image
+  const imageId = configDigest
+  const imageName = image
 
-  return { manifest, digests, configDigest, configManifestV2, image_id, image_name, diff_ids, imageUrl, token }
+  return { manifest, digests, configDigest, configManifestV2, imageId, imageName, diffIds, imageUrl, token }
 }
 
 /**
@@ -359,24 +349,27 @@ export async function pullManifestsFromRegistry(image: string, authHeaders: Axio
  * @param images - array of images
  * @returns - array of distribution manifests
  */
-export const getManifests = async (images: Array<{ [key: string]: any }>, user: string, password: string): Promise<Array<{ [key: string]: any }>> => {
-  const manifestsAll = []
+export const getManifests = async (images: Array<{ [key: string]: any }>, authHeaders: AxiosBasicCredentials): Promise<ManifestInfosFromRegistry[]> => {
+  const manifests: ManifestInfosFromRegistry[] = []
   console.log(`== Downloading Manifests @getManifests ==`)
   for (const image in images) {
     const imageName = images[image].image_name
     console.log(`=> ${parseInt(image) + 1} / ${images.length} : ${imageName}`)
-    const manifestInfo = await pullManifestsFromRegistry(imageName, { username: user, password })
-    manifestsAll.push({
+    const manifestInfo = await pullManifestsFromRegistry(imageName, authHeaders)
+    manifests.push({
       ...manifestInfo,
       ...images[image],
     })
   }
-  return manifestsAll
+  console.log(`== Downloading Manifests @getManifests DONE ==`)
+  return manifests
 }
 
 if (featureFlags.testRegistry) {
-  const imageName = process.env.IMAGE;
-  const user = process.env.USER;
-  const password = process.env.TOKEN;
-  const manifestInfo = pullManifestsFromRegistry(imageName, { username: user, password })
+  const imageName = 'registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/53b00bed7a4c6897db23eb0e4cf620e3' as  string;
+  const authHeaders = {
+    username: 'bob',
+    password: 'MckyVT59iyr9qcOkP6jVZybxPG9HPypL',
+  } as AxiosBasicCredentials;
+  const manifestInfo = pullManifestsFromRegistry(imageName, authHeaders)
 }

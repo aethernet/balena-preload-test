@@ -26,8 +26,8 @@ const dockerParseImage = (image:string) => {
       registry = ''
     }
 
-    registry = registry ? `${registry}/` : ''
-    namespace = namespace && namespace !== 'library' ? `${namespace}/` : ''
+    registry = registry ? `${registry}` : ''
+    namespace = namespace && namespace !== 'library' ? `${namespace}` : ''
     tag = tag && tag !== 'latest' ? `:${tag}` : ''
   
     const name = `${registry}${namespace}${repository}${tag}`

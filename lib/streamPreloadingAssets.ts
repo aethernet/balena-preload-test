@@ -6,7 +6,7 @@ import { getLayers, downloadProcessLayers } from "./layers"
 import { promisePacker, getTarballStream } from "./packer"
 import { getImagesConfigurationFiles } from "./images"
 import { getSupervisorImageNameFor } from "./supervisor"
-import AppsJsonSchema from "./apps-json-interface"
+import AppsJsonSchema from "./interface-apps-json"
 
 export interface PreloadIds  {
   app_id: string;
@@ -117,14 +117,14 @@ const streamPreloadingAssets = async ({
 
   // get manifests from registry for all images including pre-pre-loaded images (the ones inside the base image)
   const imagesbaseAndPreload = [...baseImages, ...images]
-  const manifests = await getManifests(imagesbaseAndPreload, user, password)
+  const manifests = await getManifests(imagesbaseAndPreload, {username: user, password})
 
   // precompute layers metadata for all layers
   const layers = await getLayers(manifests)
 
   // download and process layers, this is where most of the work is happening
-  const layersInjectableFiles = await downloadProcessLayers({ manifests, layers, packStream, injectPath })
-
+  const layersInjectableFiles = await downloadProcessLayers({ manifests, layers, packStream, injectPath }) 
+  
   // prepare images files
   const imagesInjectableFiles = getImagesConfigurationFiles(manifests)
 
@@ -144,6 +144,7 @@ const streamPreloadingAssets = async ({
   ]
 
   // inject all metadata files and folders
+  // TODO: fix header type, its getting type error
   for (const { header, content } of [...layersInjectableFiles, ...imagesInjectableFiles, ...globalInjectable]) {
     await packFile(header, content)
   }

@@ -2,7 +2,7 @@
   "name": "balena-preload-test",
   "version": "1.0.0",
   "description": "preloading",
-  "main": "main.mjs",
+  "main": "main.ts",
   "scripts": {
     "start": "ts-node main.ts",
     "prettier": "balena-lint --fix lib types tools",
