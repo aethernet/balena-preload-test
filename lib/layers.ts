@@ -3,7 +3,7 @@ import tar from "tar-stream"
 import gunzip from "gunzip-maybe"
 import { digestStream } from "./digestStream"
 import { getUrls, getBlob } from "./registry"
-import { Manifest, ManifestConfig, ManifestInfosFromRegistry, MediaType } from "./interface-manifest"
+import { ManifestConfig, ManifestInfosFromRegistry, Rootfs } from "./interface-manifest"
 import { inspect } from "util"
 import { Pack, Headers } from "tar-stream"
 
@@ -20,9 +20,8 @@ interface Layer extends ManifestConfig, LayerMeta {
   isDuplicate: boolean
   token: string
   parent: string | null
-  link: string
+  link: "link" | "symlink" | "directory" | "file" | "character-device" | "block-device" | "fifo" | "contiguous-file" | "pax-header" | "pax-global-header" | "gnu-long-link-path" | "gnu-long-path" | null | undefined;
   lower?: string | null
-  // size?: number
   cache_id?: string
 }
 
@@ -56,16 +55,16 @@ interface LayerRaw {
  * @param {[Object]} manifests - array of image config manifests
  * */
 
-async function getLayers(manifestsAll: ManifestInfosFromRegistry[]) {
-  console.log(`== getting Layers @getLayers == ${manifestsAll}`)
-  return manifestsAll
+async function getLayers(manifests: ManifestInfosFromRegistry[]) {
+  console.log(`== getting Layers @getLayers == ${manifests}`)
+  return manifests
     .map(({ diffIds, token }) => {
       // loops on images and compute / generate values all layers
       // use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
       // note : we'll generate `cache_id` later when processing the layer and link back then
       const computedLayers: Layer[] = []
       for (const key in  diffIds) {
-        const diffId: any =  diffIds[parseInt(key)] //TODO: fix this type, why does this think its manifestDigest
+        const diffId =  diffIds[parseInt(key)];
         const chainId = parseInt(key) == 0 
           ? diffId.split(":")[1] 
           : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chainId, diffId })
@@ -85,7 +84,7 @@ async function getLayers(manifestsAll: ManifestInfosFromRegistry[]) {
       // 7. compute the lower link chain
       // `lower` chain is a string composed of the path to the `link` of all lower layers in the chain
       // i.e. : `l/*sublayer1link*:l/*sublayer2link:l/*sublayer3link`
-      // lowest layer doesn't have any (empty lower)
+      // lowest layer doesn't have (empty lower)
       const chain = layers.map((layer) => `l/${layer.link}`)
       return layers.map((layer, key) => ({
         ...layer,
@@ -103,11 +102,11 @@ async function getLayers(manifestsAll: ManifestInfosFromRegistry[]) {
  */
 const getLayerDistributionDigests = (manifests: ManifestInfosFromRegistry[]) => {
   return manifests
-    .map(({ manifest, image_name, token }: any) =>
-      manifest.layers.map((layer: LayerRaw) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
+    .map(({ manifest, imageName, token }) =>
+      manifest.layers.map((layer: LayerRaw) => ({ imageName, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
     )
     .flat()
-    .filter((layer: Layer, index: number, layers: Layer[]) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
+    .filter((layer, index, layers) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
 }
 
 /**
@@ -172,14 +171,14 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
     },
   ]
 
-  // `parent` file; first layer doens't have any parent
+  // `parent` file; first layer doens't have parent
   if (parent)
     files.push({
       header: { name: `${dockerImageOverlay2LayerdbSha256ChainId}/parent`, mode: 755 },
       content: parent,
     })
 
-  // `lower` chain; last layer doesn't have any lower
+  // `lower` chain; last layer doesn't have lower
   if (lower)
     files.push({
       header: { name: `${dockerOverlay2CacheId}/lower`, mode: 644 },
@@ -219,17 +218,17 @@ const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath
   const injectableFiles = []
 
   for (const key in processingLayers) {
-    const { layer, image_name, compressedSize, token } = processingLayers[key]
+    const { layer, imageName, compressedSize, token } = processingLayers[key]
     console.log(`=> ${parseInt(key) + 1} / ${processingLayers.length} : ${layer}`)
 
     try {
       const cache_id = getRandomDiffId()
 
       // get the url
-      const { imageUrl } = getUrls(image_name)
+      const { imageUrl } = getUrls(imageName)
 
       // get the stream
-      const layerStream: any = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize })
+      const layerStream: NodeJS.ReadableStream = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize })
 
       // process the stream and get back `size` (uncompressed) and `diff_id` (digest)
       const { size, diff_id }: LayerMeta = await layerStreamProcessing({ layerStream, packStream, cache_id, injectPath })
@@ -291,7 +290,7 @@ async function layerStreamProcessing({ layerStream, packStream, cache_id, inject
     const digester = digestStream(digesterCb)
 
     // 4. tar extracted happens here
-    extract.on("entry", (header: Headers & { pax: any }, stream: NodeJS.ReadableStream) => {
+    extract.on("entry", (header: Headers & { pax?: string }, stream: NodeJS.ReadableStream) => {
       if (header.pax) {
         /**
          * DELETE header.pax here, if it exists, as it is causing problems with the symlink handling.

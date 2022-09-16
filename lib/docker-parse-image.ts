@@ -12,8 +12,7 @@
   fullname: string,
 }
 
-const dockerParseImage = (image:string) => {
-    if (!image) return null
+const dockerParseImage = (image:string): DockerParsedImage => {
     const registryArray = image.split('/')
 
     let registry = registryArray[0];

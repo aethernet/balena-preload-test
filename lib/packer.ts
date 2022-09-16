@@ -1,5 +1,17 @@
 import tar, { Pack, Headers } from "tar-stream"
 
+export interface AugmentedHeadersFile extends Headers {
+  name: string
+  mode?: number; 
+}
+
+export interface AugmentedHeadersSymlink extends Headers {
+  name: string
+  type: "symlink"; 
+  linkname: string; 
+  mode?: number; 
+}
+
 /**
  * PromisePacker
  * Promisify tar-stream.pack.entry ( https://www.npmjs.com/package/tar-stream )
@@ -12,7 +24,7 @@ import tar, { Pack, Headers } from "tar-stream"
  * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
  * */
-const promisePacker = (pack: Pack, injectFolder?: string) => (header: Headers, value: any) =>
+const promisePacker = (pack: Pack, injectFolder?: string) => (header: AugmentedHeadersSymlink | AugmentedHeadersFile, value?: string) =>
   new Promise((resolve, reject) => {
     if (header.name.includes("sha256:")) {
       console.log(`=> FIXME!! pack header.name: ${header.name}`)

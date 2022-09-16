@@ -7,6 +7,8 @@ import { promisePacker, getTarballStream } from "./packer"
 import { getImagesConfigurationFiles } from "./images"
 import { getSupervisorImageNameFor } from "./supervisor"
 import AppsJsonSchema from "./interface-apps-json"
+import { AugmentedHeadersFile, AugmentedHeadersSymlink } from "./packer"
+import { ImagesbaseAndPreload, ManifestInfosRepos } from "./interface-manifest"
 
 export interface PreloadIds  {
   app_id: string;
@@ -31,10 +33,6 @@ export interface PreloadOptions extends AppsJsonProp {
   password: string
   callback?: Function | undefined
 }
-
-// export interface ImageIdsInput {
-//   appsJson: AppsJsonSchema; 
-// }
 
 /**
  * Main Processing function
@@ -82,7 +80,7 @@ const streamPreloadingAssets = async ({
     ],
   }
 
-  await packManifest({ name: "manifest.json", mode: 644 }, JSON.stringify(manifest))
+  await packManifest({ name: "manifest.json", mode: 644 } as AugmentedHeadersFile, JSON.stringify(manifest))
 
   // Beware that knowing the file size in advance is mandatory
   const baseImageStreamEntry = packStream.entry({
@@ -103,20 +101,20 @@ const streamPreloadingAssets = async ({
   // get the supervisor image
   const baseImages = [
     {
-      image_name: await getSupervisorImageNameFor({
+      imageName: await getSupervisorImageNameFor({
         version: supervisorVersion,
         arch,
         api,
         token,
       }),
-      image_hash: "latest",
+      imageHash: "latest",
       isSupervisor: true,
       supervisorVersion,
     },
   ]
 
   // get manifests from registry for all images including pre-pre-loaded images (the ones inside the base image)
-  const imagesbaseAndPreload = [...baseImages, ...images]
+  const imagesbaseAndPreload = [...baseImages, ...images] as ImagesbaseAndPreload[]
   const manifests = await getManifests(imagesbaseAndPreload, {username: user, password})
 
   // precompute layers metadata for all layers
@@ -129,7 +127,7 @@ const streamPreloadingAssets = async ({
   const imagesInjectableFiles = getImagesConfigurationFiles(manifests)
 
   // generate repositories.json snipets for each images, merge everything and inject result
-  const newRepositoriesJson = buildRepositories({ manifests })
+  const newRepositoriesJson = buildRepositories(manifests as ManifestInfosRepos[])
 
   // prepare global metadata files
   const globalInjectable = [
@@ -146,7 +144,7 @@ const streamPreloadingAssets = async ({
   // inject all metadata files and folders
   // TODO: fix header type, its getting type error
   for (const { header, content } of [...layersInjectableFiles, ...imagesInjectableFiles, ...globalInjectable]) {
-    await packFile(header, content)
+    await packFile(header as AugmentedHeadersSymlink, content as string | undefined)
   }
 
   // close tarball

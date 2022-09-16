@@ -54,20 +54,20 @@ const getAppsJson = async ({ app_id, release_id }: PreloadIds) => {
 
 
 
-interface Image {
-  image_name: string
-  image_hash: string
+export interface Image {
+  imageName: string
+  imageHash: string
 }
 
-const getImageIds = ({ app_id, release_id, appsJson }: AppsJsonProp): Image[] => {
+const getImageIds = ({ app_id, release_id, appsJson }: AppsJsonProp)  => {
   const appId = app_id ?? Object.keys(appsJson.apps)[0]
   const releaseId = release_id ?? Object.keys(appsJson.apps?.[appId]?.releases)[0]
   console.log(`==> appId: ${appId} & releaseId: ${releaseId}`)
   const imageKeys = Object.keys(appsJson.apps?.[appId]?.releases?.[releaseId]?.services)
   const imageNames = imageKeys.map((key) => appsJson.apps?.[appId]?.releases?.[releaseId]?.services[key].image)
   return imageNames.map((image) => {
-    const [image_name, image_hash] = image.split("@")
-    return { image_name, image_hash }
+    const [imageName, imageHash] = image.split("@")
+    return { imageName, imageHash }
   })
 }
 

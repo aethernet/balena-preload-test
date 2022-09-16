@@ -96,17 +96,32 @@ export interface  ManifestInfosFromRegistry {
     diffIds: string[];
     imageUrl: string;
     token: string;
-    // imageIds: string;
 }
 
-// export interface manifestInfo: {
-//     manifest: Manifest;
-//     digests: ManifestConfig[];
-//     configDigest: string;
-//     configManifestV2: ConfigManifestV2;
-//     imageId: string;
-//     imageName: string;
-//     diffIds: string[];
-//     imageUrl: string;
-//     token: any;
-// }
+export interface ManifestInfosRepos extends  ManifestInfosFromRegistry {
+    imageHash: string;
+    imageName: string;
+    isSupervisor: boolean;
+    supervisorVersion: string;
+}
+
+export interface Image {
+    imageName: string
+    imageHash: string
+}
+
+export interface ImagesbaseAndPreload {
+    imageHash: string;
+    imageName: string;
+    isSupervisor?: boolean;
+    supervisorVersion?: string;
+}
+
+export interface RepositoriesBase {
+    Repositories: Repositories;
+}
+
+export interface Repositories {
+    [key: string]: { [key: string]: string };
+}
+ 

@@ -1,7 +1,8 @@
 import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios";
 import "dotenv/config";
 import { dockerParseImage, DockerParsedImage } from "./docker-parse-image";
-import { Manifest, ManifestInfosFromRegistry, ConfigManifestV2 } from "./interface-manifest"
+import { Manifest, ManifestInfosFromRegistry, ConfigManifestV2, ImagesbaseAndPreload } from "./interface-manifest"
+// import { ManifestInfosRepos } from "./appsJson";
 import { inspect } from "util"
 
 const featureFlags = {
@@ -59,7 +60,7 @@ https://stackoverflow.com/questions/71534322/http-stream-using-axios-node-js
  * @param {string} namespace
  * @returns 
  */
-function getRegistryUrl({ registry, namespace }: DockerParsedImage | any = null): string {
+function getRegistryUrl({ registry, namespace }: DockerParsedImage): string {
   if (!registry) return `https://registry2.balena-cloud.com/${namespace}/`
   return `https://${registry}/${namespace}/`
 }
@@ -73,7 +74,7 @@ function getRegistryUrl({ registry, namespace }: DockerParsedImage | any = null)
  */
 // NOTE the double namespace here, the 1st v2 is for docker Version2, the second is for image release Version2
 // Not sure how to get the image rel
-function getImageUrl({ registry, namespace, repository }: DockerParsedImage | any = null): string {
+function getImageUrl({ registry, namespace, repository }: DockerParsedImage): string {
   // we're only supporting docker api v2 for now
   return `https://${registry}/v2/${namespace}/${repository}`
 }
@@ -89,7 +90,7 @@ function getImageUrl({ registry, namespace, repository }: DockerParsedImage | an
  * @param layer
  * @returns
  */
-export async function getBlob(imageUrl: string, token: string, layer: { [key: string]: number | string }): Promise<Object> {
+export async function getBlob(imageUrl: string, token: string, layer: { [key: string]: number | string }): Promise<NodeJS.ReadableStream> {
   const options: AxiosRequestConfig = {
     method: "GET",
     responseType: "stream",
@@ -127,10 +128,10 @@ export async function getBlob(imageUrl: string, token: string, layer: { [key: st
  * @param {string} manifest - manifest per image
  * @returns {Promise}
  * */
-// async function getAllBlobs(imageUrl: string, token: string, manifest: { [key: string]: any }): Promise<Object> {
+// async function getAllBlobs(imageUrl: string, token: string, manifest: Manifest): Promise<Object> {
 //   try {
 //     const tgzLayersDigest = await Promise.all(
-//       manifest.layers.map(async (layer: { [key: string]: any }) => {
+//       manifest.layers.map(async (layer) => {
 //         const dataBlob = await getBlob(imageUrl, token, layer)
 //         return await dataBlob
 //       })
@@ -238,7 +239,7 @@ async function getManifest(imageUrl: string, token: string): Promise<Manifest> {
  * @param tag
  * @returns
  */
-async function getToken(parsedImage: DockerParsedImage | any = null, authHeaders: AxiosBasicCredentials, authResponse: { [key: string]: any }, tag?: string) {
+async function getToken(parsedImage: DockerParsedImage, authHeaders: AxiosBasicCredentials, authResponse: AuthRealmServiceResponseType, tag?: string) {
   try {
     const { repository, namespace } = parsedImage
     const options = {
@@ -347,11 +348,11 @@ export async function pullManifestsFromRegistry(image: string, authHeaders: Axio
  * @param images - array of images
  * @returns - array of distribution manifests
  */
-export const getManifests = async (images: Array<{ [key: string]: any }>, authHeaders: AxiosBasicCredentials): Promise<ManifestInfosFromRegistry[]> => {
+export const getManifests = async (images: ImagesbaseAndPreload[], authHeaders: AxiosBasicCredentials): Promise<ManifestInfosFromRegistry[]> => {
   const manifests: ManifestInfosFromRegistry[] = []
   console.log(`== Downloading Manifests @getManifests ==`)
   for (const image in images) {
-    const imageName = images[image].image_name
+    const imageName = images[image].imageName
     console.log(`=> ${parseInt(image) + 1} / ${images.length} : ${imageName}`)
     const manifestInfo = await pullManifestsFromRegistry(imageName, authHeaders)
     manifests.push({

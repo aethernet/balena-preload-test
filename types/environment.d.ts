@@ -23,11 +23,6 @@ declare global {
       }
     }
   }
-  
-// Module example
-//   declare module "digest-stream" {
-//     export default function digestStream(algorithm: string, inputEncoding: string, digestEncoding?: any, options?: any, listenerFn?: any): any
-//   }
 
 // If this file has no import/export statements (i.e. is a script)
 // convert it into a module by adding an empty export statement.
