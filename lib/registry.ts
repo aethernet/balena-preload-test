@@ -1,13 +1,11 @@
 import axios, { AxiosRequestConfig, AxiosBasicCredentials } from "axios";
-import "dotenv/config"
-import { env } from "process"
-// https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
+import "dotenv/config";
 import { dockerParseImage, DockerParsedImage } from "./docker-parse-image";
-import { Manifest, ManifestsAll, ManifestInfosFromRegistry, ConfigManifestV2 } from "./interface-manifest"
+import { Manifest, ManifestInfosFromRegistry, ConfigManifestV2 } from "./interface-manifest"
 import { inspect } from "util"
 
 const featureFlags = {
-  testRegistry: true,
+  testRegistry: false,
 }
 
 /**
