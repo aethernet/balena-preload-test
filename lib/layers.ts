@@ -130,7 +130,7 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
     // `link` symlink from `l/_link_` to `../_cache_id_/diff`
     {
       header: {
-        name: `dockerOverlay2l/${link}`,
+        name: `${dockerOverlay2l}/${link}`,
         type: "symlink",
         linkname: `../${cache_id}/diff`,
       },
