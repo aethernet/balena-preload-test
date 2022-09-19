@@ -1,0 +1,36 @@
+{
+    "Repositories": {
+      "balena/balena-admin": {
+        "balena/balena-admin:v2.4.4": "sha256:8e2670ee768e2b86081562b2fe1524bc20ad16e48558f8c6aa26328d6dfca756",
+        "balena/balena-admin@sha256:2fb728685e3adb646329c13784357e79b70a490baad20721a5b887305bc637e0": "sha256:8e2670ee768e2b86081562b2fe1524bc20ad16e48558f8c6aa26328d6dfca756"
+      },
+      "balena/balena-delta": {
+        "balena/balena-delta:v3.1.9": "sha256:8297d17a74e9267a62cf772f6692a914f539c0af5d0a8995209dea33139e459a",
+        "balena/balena-delta@sha256:d609647ee9b7952da6ffea58c1dc6573ebdd1edad9f810cd552a13a40968add2": "sha256:8297d17a74e9267a62cf772f6692a914f539c0af5d0a8995209dea33139e459a"
+      },
+      "balena/balena-monitor": {
+        "balena/balena-monitor:v2.15.19": "sha256:ff37f36fe773f3ca8cf14c9c35497abe6c386f5de87df3f09ee4dae17bd4b042",
+        "balena/balena-monitor@sha256:d16014cdb2ebb4c97ea1580e4d696357b7e229e44a962d2ca7d5517a539f215a": "sha256:ff37f36fe773f3ca8cf14c9c35497abe6c386f5de87df3f09ee4dae17bd4b042"
+      },
+      "balena/balena-sentry": {
+        "balena/balena-sentry:v1.17.4": "sha256:20e31a872fa49eda6247efd6e2d00c7aa0a73ad658037e653c40d4d35bebd8c4",
+        "balena/balena-sentry@sha256:08d28f85c334683c0d3835b5f847679e405caa4e5be52c165fc3e8404486076e": "sha256:20e31a872fa49eda6247efd6e2d00c7aa0a73ad658037e653c40d4d35bebd8c4"
+      },
+      "balena/e2e-browser-tests": {
+        "balena/e2e-browser-tests:v1.17.1": "sha256:2f5be28ed21d141a8ebd134b3e1bd1d0ab8ab37f06bb4856536477fbea757c17",
+        "balena/e2e-browser-tests@sha256:b876e01f2c71ab64d562bbdf0675c237075d498c745eaeeb9699e0af2c1a6954": "sha256:2f5be28ed21d141a8ebd134b3e1bd1d0ab8ab37f06bb4856536477fbea757c17"
+      },
+      "balena/open-balena-base": {
+        "balena/open-balena-base:v13.3.1": "sha256:eabf902914f133bb48998c0551aed216c825e1be04dd2b88de01fc09350d0e06",
+        "balena/open-balena-base@sha256:0e69e9d743b1d3cdd0e5159d25fcc6d3f1df6a5e2b278901cdc05c887325107a": "sha256:eabf902914f133bb48998c0551aed216c825e1be04dd2b88de01fc09350d0e06"
+      },
+      "balena/open-balena-s3": {
+        "balena/open-balena-s3:v2.13.9": "sha256:123f9baa86ecdf66b26d154248bb414abca0865ebe6da43b5f7510a04a900edc",
+        "balena/open-balena-s3@sha256:006af3c663bf08e4e0883e3e300c02271b2cebfc5ab7c3a81033fec089c45094": "sha256:123f9baa86ecdf66b26d154248bb414abca0865ebe6da43b5f7510a04a900edc"
+      },
+      "golang": {
+        "golang:1.18-alpine": "sha256:f5ae5d299f4c856129e732624d40bae1acb4af986811c50a5a4817fdcd31c03b",
+        "golang@sha256:7cc62574fcf9c5fb87ad42a9789d5539a6a085971d58ee75dd2ee146cb8a8695": "sha256:f5ae5d299f4c856129e732624d40bae1acb4af986811c50a5a4817fdcd31c03b"
+      }
+    }
+  }
