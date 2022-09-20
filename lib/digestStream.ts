@@ -11,6 +11,7 @@ const digestStream = (exfiltrate: Function): Transform => {
     transform(chunk: Buffer, _, callback) {
       digester.update(chunk)
       length += chunk.length
+      this.push(chunk)
       callback()
     },
   })
