@@ -137,7 +137,7 @@ const streamPreloadingAssets = async ({
   }
 
   // close tarball
-  packStream.finalize()
+  await packStream.finalize()
   console.log("==> FINISHED @streamPreloadingAssets")
   console.log("==> change consoleLevel log levels in logger.mjs for less verbose logging")
 
