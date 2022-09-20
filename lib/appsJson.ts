@@ -8,9 +8,9 @@
  */
 
 // import logger from "../logger.mjs"
-import { readJson } from "fs-extra"
-import { PreloadIds, AppsJsonProp } from "./streamPreloadingAssets"
-import { inspect } from "util"
+import { readJson } from 'fs-extra';
+import { PreloadIds, AppsJsonProp } from './streamPreloadingAssets';
+import { inspect } from 'util';
 
 /**
  * Derives Apps.json from target state obtained from the api
@@ -23,51 +23,57 @@ import { inspect } from "util"
  * @returns {json} - apps.json object
  */
 const getAppsJson = async ({ appId, releaseId }: PreloadIds) => {
-  console.log('getAppsJson appId', appId)
-  console.log('getAppsJson releaseId', releaseId)
-  //   // FIXME: is fleetUUID equal to appId ? If not it will be required
-  //   // In production those informations should already be available in image-maker
-  //   const options = {
-  //     method: "GET",
-  //     url: `https://api.${process.env.BALENAENV}/device/v3/fleet-state/${fleetUuid}/release/${releaseId}`,
-  //     headers: {
-  //       "Content-Type": "application/json",
-  //       Authorization: `Bearer ${bobApiToken}`,
-  //     }
-  //   }
+	console.log('getAppsJson appId', appId);
+	console.log('getAppsJson releaseId', releaseId);
+	//   // FIXME: is fleetUUID equal to appId ? If not it will be required
+	//   // In production those informations should already be available in image-maker
+	//   const options = {
+	//     method: "GET",
+	//     url: `https://api.${process.env.BALENAENV}/device/v3/fleet-state/${fleetUuid}/release/${releaseId}`,
+	//     headers: {
+	//       "Content-Type": "application/json",
+	//       Authorization: `Bearer ${bobApiToken}`,
+	//     }
+	//   }
 
-  //   try {
-  //     const { data, headers } = await axios(options)
-  //     return await data
-  //   } catch (error) {
-  //     console.error("\n\n==> getBlob error:", inspect(error, true, 2, true))
-  //   }
-  // }
+	//   try {
+	//     const { data, headers } = await axios(options)
+	//     return await data
+	//   } catch (error) {
+	//     console.error("\n\n==> getBlob error:", inspect(error, true, 2, true))
+	//   }
+	// }
 
-  return await readJson("in/apps.json")
-}
+	return await readJson('in/apps.json');
+};
 
 /**
  * Takes a apps.json and returns the list of images for an app & release.
  * If appsId and/or releaseId is unkown it will return first.
  * // TODO: return all instead of first when no app or release is specified.
  */
-const getImageIds = ({ appId, releaseId, appsJson }: AppsJsonProp)  => {
+const getImageIds = ({ appId, releaseId, appsJson }: AppsJsonProp) => {
+	const appIdImage = appId ?? Object.keys(appsJson.apps)[0];
+	console.log(`@getImageIds ==> appIdImage: ${appIdImage}`);
 
-  const appIdImage = appId ?? Object.keys(appsJson.apps)[0]
-  console.log(`@getImageIds ==> appIdImage: ${appIdImage}`)
+	const releaseIdImage =
+		releaseId ?? Object.keys(appsJson.apps?.[appIdImage]?.releases)[0];
+	console.log(`@getImageIds ==> releaseIdImage: ${releaseIdImage}`);
 
-  const releaseIdImage = releaseId ?? Object.keys(appsJson.apps?.[appIdImage]?.releases)[0]
-  console.log(`@getImageIds ==> releaseIdImage: ${releaseIdImage}`)
+	const imageKeys = Object.keys(
+		appsJson.apps?.[appIdImage]?.releases?.[releaseIdImage]?.services,
+	);
+	// console.log(`@getImageIds ==> imageKeys ${imageKeys}`)
 
-  const imageKeys = Object.keys(appsJson.apps?.[appIdImage]?.releases?.[releaseIdImage]?.services)
-  // console.log(`@getImageIds ==> imageKeys ${imageKeys}`)
+	const imageNames = imageKeys.map(
+		(key) =>
+			appsJson.apps?.[appIdImage]?.releases?.[releaseIdImage]?.services[key]
+				.image,
+	);
+	return imageNames.map((image) => {
+		const [imageName, imageHash] = image.split('@');
+		return { imageName, imageHash };
+	});
+};
 
-  const imageNames = imageKeys.map((key) => appsJson.apps?.[appIdImage]?.releases?.[releaseIdImage]?.services[key].image)
-  return imageNames.map((image) => {
-    const [imageName, imageHash] = image.split("@")
-    return { imageName, imageHash }
-  })
-}
-
-export { getAppsJson, getImageIds }
+export { getAppsJson, getImageIds };

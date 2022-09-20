@@ -22,36 +22,41 @@
  *
  */
 
-import axios from "axios"
+import axios from 'axios';
 
-interface supervisorImageNameIn {
-  version: string
-  arch: string
-  api?: string
-  token?: string
+interface SupervisorImageNameIn {
+	version: string;
+	arch: string;
+	api?: string;
+	token?: string;
 }
 
 /**
  * Fetch the supervisor image name (pullable url) from api for a version and arch
  *
  */
-const getSupervisorImageNameFor = async ({ version, arch, api, token }: supervisorImageNameIn): Promise<string | undefined> => {
-  const options = {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ContentType: "application/json",
-    },
-    url: `https://${
-      api ?? process.env.API ?? "api.balena-cloud.com"
-    }/v6/supervisor_release?\$top=1&\$select=image_name&\$filter=(supervisor_version%20eq%20%27${version}%27)%20and%20(is_for__device_type/any(ifdt:ifdt/is_of__cpu_architecture/any(ioca:ioca/slug%20eq%20%27${arch}%27)))`,
-  }
-  try {
-    const { data } = await axios(options)
-    return data?.d?.[0]?.image_name
-  } catch (error) {
-    console.error("\n\n==> getBlob error:", error)
-  }
-}
+const getSupervisorImageNameFor = async ({
+	version,
+	arch,
+	api,
+	token,
+}: SupervisorImageNameIn): Promise<string | undefined> => {
+	const options = {
+		method: 'GET',
+		headers: {
+			Authorization: `Bearer ${token}`,
+			ContentType: 'application/json',
+		},
+		url: `https://${
+			api ?? process.env.API ?? 'api.balena-cloud.com'
+		}/v6/supervisor_release?\$top=1&\$select=image_name&\$filter=(supervisor_version%20eq%20%27${version}%27)%20and%20(is_for__device_type/any(ifdt:ifdt/is_of__cpu_architecture/any(ioca:ioca/slug%20eq%20%27${arch}%27)))`,
+	};
+	try {
+		const { data } = await axios(options);
+		return data?.d?.[0]?.image_name;
+	} catch (error) {
+		console.error('\n\n==> getBlob error:', error);
+	}
+};
 
-export { getSupervisorImageNameFor }
+export { getSupervisorImageNameFor };
