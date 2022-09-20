@@ -1,0 +1,59 @@
+fdisk(8), mount(8), newfs(8), pdisk(8), gpt
+
+
+https://unix.stackexchange.com/questions/104238/fdisk-vs-parted
+
+Create another CPIO archive
+
+
+Build QMU for at least 3 platforms
+
+Build flags to do bare essentials
+
+Micro VM - using to run QEMU
+
+
+Bash script for resizing
+
+X86 kernel with QMEU? Javascript virtualization - 
+
+Using build root
+
+Handfull of drivers - vert - io
+ 
+Etcher SDK - run a VM
+
+JS linux - tiny EMU
+
+Snapshot?
+
+
+
+
+
+
+
+
+Stripped down X86 Kernel run on JS linux
+
+Etcher sdk with JSK linux - take any x86 kernel get any text output 
+
+V86 - 
+
+https://github.com/copy/v86
+
+Using i386
+
+
+https://github.com/copy/v86#api-examples
+
+
+Metadata devices
+
+https://github.com/aethernet/balena-preload-test/blob/zoobot/expander/lib/expander.sh
+Joseph Alan Kogut9:14 AM
+https://github.com/balena-os/meta-balena/blob/master/meta-balena-common/recipes-core/initrdscripts/files/resindataexpander
+Joseph Alan Kogut9:41 AM
+https://github.com/copy/v86
+Joseph Alan Kogut9:43 AM
+https://github.com/copy/v86#api-examples

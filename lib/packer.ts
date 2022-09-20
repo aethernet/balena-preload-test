@@ -1,6 +1,16 @@
-import tar from "tar-stream"
-import path from "path"
-import logger from "../logger.mjs"
+import tar, { Pack, Headers } from "tar-stream"
+
+export interface AugmentedHeadersFile extends Headers {
+  name: string
+  mode?: number; 
+}
+
+export interface AugmentedHeadersSymlink extends Headers {
+  name: string
+  type: "symlink"; 
+  linkname: string; 
+  mode?: number; 
+}
 
 /**
  * PromisePacker
@@ -14,16 +24,15 @@ import logger from "../logger.mjs"
  * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
  * */
-const promisePacker = (pack, injectFolder) => (header, value, cb) =>
+const promisePacker = (pack: Pack, injectFolder?: string) => (header: AugmentedHeadersSymlink | AugmentedHeadersFile, value?: string) =>
   new Promise((resolve, reject) => {
     if (header.name.includes("sha256:")) {
-      logger.error(`=> FIXME!! pack header.name: ${header.name}`)
+      console.log(`=> FIXME!! pack header.name: ${header.name}`)
     }
     // add the root injectable folder in front of the name when injecting files
     if (injectFolder) header.name = `${injectFolder}/${header.name}`
     pack.entry(header, value, (error) => {
       if (error) reject(error)
-      if (cb) cb()
       resolve(true)
     })
   })
@@ -34,7 +43,7 @@ const promisePacker = (pack, injectFolder) => (header, value, cb) =>
  * @param {Stream} outputStream
  * @returns Streamable tar packer
  */
-const getTarballStream = (outputStream) => {
+const getTarballStream = (outputStream: NodeJS.WritableStream): Pack => {
   // logger.log(`=> prepareTarball outputStream: ${inspect(outputStream,true,5,true)}`)
   const pack = tar.pack()
   pack.pipe(outputStream)

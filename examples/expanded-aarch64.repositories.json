@@ -1,0 +1,14 @@
+{
+    "Repositories": {
+        "balena-healthcheck-image": {
+            "balena-healthcheck-image:latest": "sha256:46331d942d6350436f64e614d75725f6de3bb5c63e266e236e04389820a234c4"
+        },
+        "balena_supervisor": {
+            "balena_supervisor:v14.0.8": "sha256:936d20a463f5883f036a0b348c8c532112ce683fac7f161ef5a4fe1411c26f83"
+        },
+        "registry2.balena-cloud.com/v2/04a158f884a537fc1bd11f2af797676a": {
+            "registry2.balena-cloud.com/v2/04a158f884a537fc1bd11f2af797676a:latest": "sha256:936d20a463f5883f036a0b348c8c532112ce683fac7f161ef5a4fe1411c26f83",
+            "registry2.balena-cloud.com/v2/04a158f884a537fc1bd11f2af797676a@sha256:e92705ca7b350a7e41850cdfbd9c70ee924972a7e1ae03aa91f77771f9023558": "sha256:936d20a463f5883f036a0b348c8c532112ce683fac7f161ef5a4fe1411c26f83"
+        }
+    }
+}

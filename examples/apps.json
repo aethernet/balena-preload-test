@@ -1,0 +1,171 @@
+{
+    "name": "odrum-d0",
+    "apps": {
+        "ee6c3b3f75ae456d9760171a27a36568": {
+            "id": 12,
+            "name": "odrum",
+            "is_host": false,
+            "class": "fleet",
+            "releases": {
+                "63908fb619fceb7bc30de7d93c207af2": {
+                    "id": 46,
+                    "services": {
+                        "audio": {
+                            "id": 49,
+                            "image_id": 94,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/b182ceb15ee70683bd7e59a546c2b7b1@sha256:6f30b18ed4ef19daceb79957f2115eb1c9c66953efa1694cde4f260c709bcea0",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {
+                                "io.balena.features.dbus": "1"
+                            },
+                            "composition": {
+                                "privileged": true,
+                                "labels": {
+                                    "io.balena.features.dbus": "1"
+                                },
+                                "ports": [
+                                    "4317:4317"
+                                ]
+                            }
+                        },
+                        "sound-supervisor": {
+                            "id": 50,
+                            "image_id": 95,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/e6d9c0be2ea97bac7cbe3900c32bb99e@sha256:757abcbc9be18cd2989b00d48f3a71af48ee4346f7e2b02e13054cf5ef524f96",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {
+                                "io.balena.features.balena-api": "1",
+                                "io.balena.features.supervisor-api": "1"
+                            },
+                            "composition": {
+                                "network_mode": "host",
+                                "labels": {
+                                    "io.balena.features.balena-api": "1",
+                                    "io.balena.features.supervisor-api": "1"
+                                }
+                            }
+                        },
+                        "multiroom-server": {
+                            "id": 51,
+                            "image_id": 96,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/cec4700d692c218dddb1782c1b3b98da@sha256:675011ed4f41efe06e45d3fec381b39f86e792e0a1038306bcab457df04461d0",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {},
+                            "composition": {
+                                "restart": "on-failure",
+                                "ports": [
+                                    "1704:1704",
+                                    "1705:1705",
+                                    "1780:1780"
+                                ]
+                            }
+                        },
+                        "multiroom-client": {
+                            "id": 52,
+                            "image_id": 97,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/51a9d1e1cba79366c8445eecde9658f1@sha256:3f3ceebb2d80d8f8d17050d8bd695098e73b0f9b75346766046af909483f31e1",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {},
+                            "composition": {
+                                "restart": "on-failure"
+                            }
+                        },
+                        "bluetooth": {
+                            "id": 53,
+                            "image_id": 98,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/12ac9f874cafdb55fb1a3d0278a88694@sha256:e49a345f51cda1b21138c633124b0f3ff7ecb892b0b28fcaf83840848b42d575",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {
+                                "io.balena.features.dbus": "1"
+                            },
+                            "composition": {
+                                "restart": "on-failure",
+                                "network_mode": "host",
+                                "cap_add": [
+                                    "NET_ADMIN"
+                                ],
+                                "labels": {
+                                    "io.balena.features.dbus": "1"
+                                }
+                            }
+                        },
+                        "airplay": {
+                            "id": 54,
+                            "image_id": 99,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/da4308f2110fc98070e349a03cd9eef5@sha256:5affd99f1f1b22ea1e405b60e52ad3a75e9905da514a8d7fd85a22aa2f35b7e7",
+                            "environment": {
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {
+                                "io.balena.features.dbus": "1"
+                            },
+                            "composition": {
+                                "restart": "on-failure",
+                                "network_mode": "host",
+                                "privileged": true,
+                                "labels": {
+                                    "io.balena.features.dbus": "1"
+                                }
+                            }
+                        },
+                        "hostname": {
+                            "id": 56,
+                            "image_id": 100,
+                            "image": "registry2.77105551e3a8a66011f16b1fe82bc504.bob.local/v2/c5ebf667655dda53fea999150d3e8893@sha256:390c900485cd5f2c12f49b544a281b46a057d2b19c15d213a3a17a4b35d5d09b",
+                            "environment": {
+                                "SET_HOSTNAME": "balena",
+                                "AUDIO_OUTPUT": "AUTO",
+                                "SOUND_VOLUME": "75"
+                            },
+                            "labels": {
+                                "io.balena.features.supervisor-api": "1"
+                            },
+                            "composition": {
+                                "restart": "no",
+                                "labels": {
+                                    "io.balena.features.supervisor-api": "1"
+                                },
+                                "environment": {
+                                    "SET_HOSTNAME": "balena"
+                                }
+                            }
+                        }
+                    },
+                    "volumes": {
+                        "spotifycache": {}
+                    }
+                }
+            }
+        }
+    },
+    "config": {
+        "RESIN_SUPERVISOR_DELTA_VERSION": "3",
+        "RESIN_SUPERVISOR_NATIVE_LOGGER": "true",
+        "RESIN_HOST_CONFIG_avoid_warnings": "1",
+        "RESIN_HOST_CONFIG_disable_splash": "1",
+        "RESIN_HOST_CONFIG_dtoverlay": "\"vc4-kms-v3d\"",
+        "RESIN_HOST_CONFIG_dtparam": "\"i2c_arm=on\",\"spi=on\",\"audio=on\"",
+        "RESIN_HOST_CONFIG_gpu_mem": "16",
+        "RESIN_HOST_FIREWALL_MODE": "",
+        "RESIN_SUPERVISOR_DELTA": "1",
+        "RESIN_SUPERVISOR_LOCAL_MODE": "0",
+        "RESIN_SUPERVISOR_POLL_INTERVAL": "900000",
+        "RESIN_SUPERVISOR_DELTA_REQUEST_TIMEOUT": "59000"
+    }
+}

@@ -11,7 +11,7 @@
  * Which shouldn't have any impact, but is worth noting "au cas où"
  */
 
-import logger from "../logger.mjs"
+import { ManifestInfosRepos, Repositories, ManifestInfosFromRegistry } from "./interface-manifest"
 
 /**
  * Relative path of repositories.json as injected in the resin-data partition
@@ -19,24 +19,31 @@ import logger from "../logger.mjs"
  */
 const repositoriesJsonInjectionPath = "docker/image/overlay2/repositories.json"
 
+// TODO repositories.json types
+// interface Repositories {
+//   [image_name: string]:
+// }
+
 /**
  * createAllRepositoriesFragments
  */
-const createAllRepositoriesFragments = (manifests) => {
-  const repositories = {}
-  for (const { image_id, image_name, image_hash, isSupervisor, supervisorVersion } of manifests) {
+
+
+const createAllRepositoriesFragments = (manifests: ManifestInfosRepos[]) => {
+  const repositories: Repositories = {}
+  for (const { imageId, imageName, imageHash, isSupervisor, supervisorVersion } of manifests) {
     // prepare repositories
-    repositories[image_name] = {
-      [`${image_name}:latest`]: `sha256:${image_id}`,
+    repositories[imageName] = {
+      [`${imageName}:latest`]: `sha256:${imageId}`,
     }
-    if (image_hash !== "latest") repositories[image_name][`${image_name}:@${image_hash}`] = `sha256:${image_id}`
+    if (imageHash !== "latest") repositories[imageName][`${imageName}:@${imageHash}`] = `sha256:${imageId}`
 
     if (isSupervisor)
       repositories["balena_supervisor"] = {
-        [`balena_supervisor:${supervisorVersion}`]: image_id,
+        [`balena_supervisor:${supervisorVersion}`]: imageId,
       }
   }
-  logger.info("==> @createAllRepositoriesFragments repositories")
+  console.log("==> @createAllRepositoriesFragments repositories")
   return repositories
 }
 
@@ -45,15 +52,15 @@ const createAllRepositoriesFragments = (manifests) => {
  * @param {Array} manifests - images manifests
  * @param {JSON} repositoriesJson - origal repositories.json
  */
-const buildRepositories = ({ manifests }) => {
-  logger.warn("== Build Repositories @buildRepositories ==")
+const buildRepositories = ( manifests: ManifestInfosRepos[]) => {
+  console.log("== Build Repositories @buildRepositories ==")
 
   // generate repositories fragments for preloaded images
   const repositories = {
     Repositories: createAllRepositoriesFragments(manifests),
   }
 
-  logger.debug("repositories.json", repositories)
+  console.log("repositories.json", repositories)
 
   return repositories
 }
