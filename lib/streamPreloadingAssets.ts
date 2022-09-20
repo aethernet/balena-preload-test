@@ -11,27 +11,27 @@ import { AugmentedHeadersFile, AugmentedHeadersSymlink } from "./packer"
 import { ImagesbaseAndPreload, ManifestInfosRepos } from "./interface-manifest"
 
 export interface PreloadIds  {
-  app_id: string;
-  release_id: string;
+  appId: string;
+  releaseId: string;
 }
 
 export interface AppsJsonProp extends PreloadIds {
   appsJson: AppsJsonSchema; 
 }
 
-export interface PreloadOptions extends AppsJsonProp {
+export interface PreloadOptions extends PreloadIds {
   outputStream: NodeJS.WritableStream
   balenaosStream: NodeJS.ReadableStream
+  supervisorVersion: string
+  arch: string
   balenaosSize: number
   api: string
   token: string
-  arch: string
   balenaosRef: string
   dataPartition: number
-  supervisorVersion: string
   user: string
   password: string
-  callback?: Function | undefined
+  callback?: Function
 }
 
 /**
@@ -47,8 +47,8 @@ const streamPreloadingAssets = async ({
   balenaosSize,
   supervisorVersion,
   arch,
-  app_id,
-  release_id,
+  appId,
+  releaseId,
   balenaosRef,
   dataPartition = 6,
   api,
@@ -56,7 +56,7 @@ const streamPreloadingAssets = async ({
   user,
   password,
   callback,
-}: PreloadOptions): Promise<void> => {
+}: any): Promise<void> => {
   // ##############
   // Processing
   // ##############
@@ -93,10 +93,10 @@ const streamPreloadingAssets = async ({
   await streamBaseImage({ pipeStreamFrom: balenaosStream, pipeStreamTo: baseImageStreamEntry })
 
   // get apps.json
-  const appsJson = await getAppsJson({ app_id, release_id })
+  const appsJson = await getAppsJson({ appId, releaseId })
 
   // extract image_ids from appsJson
-  const images = getImageIds({ appsJson, app_id, release_id })
+  const images = getImageIds({ appsJson, appId, releaseId })
 
   // get the supervisor image
   const baseImages = [

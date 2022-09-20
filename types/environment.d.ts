@@ -9,7 +9,7 @@ declare global {
         BALENAOS: string
         USER: string
         PASSWORD: string
-        TARBALL: string
+        TARBALL: 'PathLike'
         BALENAENV: string
         DEVICEADDRESS: string
         CONSOLELEVEL: string
@@ -18,7 +18,7 @@ declare global {
         API_TOKEN: string
         SV_VERSION: string
         ARCH: string
-        BASEIMAGE: string
+        BASEIMAGE: 'PathLike'
         IMAGE: string
       }
     }

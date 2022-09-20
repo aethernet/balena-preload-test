@@ -2,14 +2,14 @@ import { streamPreloadingAssets } from "./lib/streamPreloadingAssets"
 import "dotenv/config"
 import fsx from "fs-extra"
 
-const app_id = process.env.APPID
-const release_id = process.env.RELEASEID
+const appId = process.env.APPID
+const releaseId = process.env.RELEASEID
 const balenaosRef = process.env.BALENAOS
-const tarball = process.env.TARBALL
-const dataPartition = parseInt(process.env.DATA_PARTITION, 10)
+const tarball = process.env.TARBALL!;
+const dataPartition = parseInt(process.env.DATA_PARTITION!, 10);
 const supervisorVersion = process.env.SV_VERSION
 const arch = process.env.ARCH
-const baseImage = process.env.BASEIMAGE
+const baseImage = process.env.BASEIMAGE!;
 const api = process.env.API
 const token = process.env.API_TOKEN
 const user = process.env.USER
@@ -29,6 +29,7 @@ const outputStream = fsx.createWriteStream(tarball)
 const balenaosStream = fsx.createReadStream(baseImage)
 const balenaosSize = getImageSize(baseImage)
 
+//TODO what is callback doing?
 balenaosStream.on("open", async () => {
   await streamPreloadingAssets({
     outputStream,
@@ -36,15 +37,15 @@ balenaosStream.on("open", async () => {
     balenaosSize,
     supervisorVersion,
     arch,
-    app_id,
-    release_id,
+    appId,
+    releaseId,
     balenaosRef,
     dataPartition,
     api,
     token,
     user,
     password,
-    callback,
+    callback: () => {},
   })
 })
 
