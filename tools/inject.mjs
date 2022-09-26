@@ -53,8 +53,8 @@ const { argv } = process
 if (~argv.indexOf('-h')) {
   usage()
 }
-const input = argv[3]
-const output = argv[4]
+const input = argv[2]
+const output = argv[3]
 if (!(output && input)) {
   console.error(`input and output are required. Got ${input} and ${output}`)
   usage()
