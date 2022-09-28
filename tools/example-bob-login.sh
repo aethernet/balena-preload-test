@@ -12,18 +12,21 @@
 # -------------------------------------------------------
 # SET Nuc ids
 # -------------------------------------------------------
+username="zoobot";
+machine_name="nuc";
 
-uuid=$(printf "results:\n$(sudo balena scan)" \
-  | yq e '.results[] | select(.osVariant=="development").host' - \
-  | awk -F'.' '{print $1}' | head -n 1); echo $uuid;
+# uuid=$(printf "results:\n$(sudo balena scan)" \
+#   | yq e '.results[] | select(.osVariant=="development").host' - \
+#   | awk -F'.' '{print $1}' | head -n 1); 
+uuid="7710555";
+echo $uuid;
 
-balena_device_uuid="$(balena devices|grep ${username}|grep ${machine_name}|grep true|awk '{print $NF}'| awk -F'[[:space:]="/]+' '{print $(NF-1)}')"; echo $balena_device_uuid;
+# balena_device_uuid="$(balena devices|grep ${username}|grep ${machine_name}|grep true|awk '{print $NF}'| awk -F'[[:space:]="/]+' '{print $(NF-1)}')";
+balena_device_uuid="77105551e3a8a66011f16b1fe82bc504";
+echo $balena_device_uuid;
 
-tld='bob.local'
-
-echo $uuid
-echo $balena_device_uuid
-echo $tld
+tld="bob.local";
+echo $tld;
 
 # ensure you can reach relevant mDNS (.local) hosts[fn4]:
 ping -c 1 ${uuid}.local && ping -c 1 api.${balena_device_uuid}.${tld}
@@ -38,10 +41,10 @@ ping -c 1 ${uuid}.local && ping -c 1 api.${balena_device_uuid}.${tld}
 # DOCKER_HOST=${uuid}.local docker cp ${cert_manager}:/certs/private/ca-bundle.${balena_device_uuid}.${tld}.pem balena/
 # echo $DOCKER_HOST
 
-# export NODE_EXTRA_CA_CERTS="/Users/rose/Documents/balena-io/balena-cloud/balena/ca-bundle.${balena_device_uuid}.${tld}.pem"
-# echo $NODE_EXTRA_CA_CERTS
+export NODE_EXTRA_CA_CERTS="/Users/rose/Documents/balena-io/balena-cloud/balena/ca-bundle.${balena_device_uuid}.${tld}.pem"
+echo $NODE_EXTRA_CA_CERTS
 
-# * ⚠️ add CA root certificates and mark trusted (e.g. macOS):
+# # * ⚠️ add CA root certificates and mark trusted (e.g. macOS):
 # sudo security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain ${NODE_EXTRA_CA_CERTS}
 
 
@@ -75,6 +78,7 @@ balena login --credentials \
   --password "${admin_password}"
 
 bob_api_token="$(cat < ~/.balena/token)"
+echo $bob_api_token
 
 username="$(balena whoami | grep USERNAME | cut -c11-)"
 api_key="$(balena api-key generate "${username}")"

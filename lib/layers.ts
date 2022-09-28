@@ -1,31 +1,51 @@
-import crypto from "crypto"
-import tar from "tar-stream"
-import gunzip from "gunzip-maybe"
-import { digestStream } from "./digestStream"
-import { getUrls, getBlob } from "./registry"
-import { inspect } from "util"
-import { Pack, Headers } from "tar-stream"
+import crypto from 'crypto';
+import tar from 'tar-stream';
+import gunzip from 'gunzip-maybe';
+import { digestStream } from './digestStream';
+import { getUrls, getBlob } from './registry';
+import {
+	ManifestConfig,
+	ManifestInfosFromRegistry,
+	Rootfs,
+} from './interface-manifest';
+import { inspect } from 'util';
+import { Pack, Headers } from 'tar-stream';
 
 interface LayerMeta {
-  size: number
-  diff_id: string | null
+	size: number;
+	diff_id: string | null;
 }
 
-interface Layer {
-  diff_id: string
-  chain_id: string
-  isDuplicate: boolean
-  token: string
-  parent: string | null
-  link: string
-  lower?: string
-  size?: number
-  cache_id?: string
+interface Layer extends ManifestConfig, LayerMeta {
+	diff_id: string;
+	chain_id: string;
+	diffId: string | number | null;
+	chainId: string;
+	isDuplicate: boolean;
+	token: string;
+	parent: string | null;
+	link:
+		| 'link'
+		| 'symlink'
+		| 'directory'
+		| 'file'
+		| 'character-device'
+		| 'block-device'
+		| 'fifo'
+		| 'contiguous-file'
+		| 'pax-header'
+		| 'pax-global-header'
+		| 'gnu-long-link-path'
+		| 'gnu-long-path'
+		| null
+		| undefined;
+	lower?: string | null;
+	cacheId?: string;
 }
 
 interface LayerRaw {
-  size: number
-  digest: string
+	size: number;
+	digest: string;
 }
 
 /**
@@ -49,44 +69,60 @@ interface LayerRaw {
  * and find the matching pre-computed meta-data in this `layers` array.
  *
  * @param {[Object]} manifests - array of image config manifests
- * */
+ */
 
-async function getLayers(manifests: any) {
-  console.log(`== getting Layers @getLayers ==`)
-  return manifests
-    .map(({ diff_ids, token }: { diff_ids: string[]; token: string }) => {
-      // loops on images and compute / generate values all layers
-      // use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
-      // note : we'll generate `cache_id` later when processing the layer and link back then
-      const computedLayers: Layer[] = []
-      for (const key in diff_ids) {
-        const diff_id = diff_ids[parseInt(key)]
-        const chain_id =
-          parseInt(key) == 0 ? diff_id.split(":")[1] : computeChainId({ previousChainId: computedLayers[parseInt(key) - 1].chain_id, diff_id })
-        const duplicateOf = computedLayers.find((layer) => layer.chain_id === chain_id)
-        computedLayers.push({
-          token,
-          diff_id,
-          chain_id,
-          parent: parseInt(key) > 0 ? computedLayers[parseInt(key) - 1].chain_id : null,
-          isDuplicate: Boolean(duplicateOf),
-          link: duplicateOf ? duplicateOf.link : crypto.randomBytes(13).toString("hex").toUpperCase(),
-        })
-      }
-      return computedLayers
-    })
-    .map((layers: Layer[]) => {
-      // 7. compute the lower link chain
-      // `lower` chain is a string composed of the path to the `link` of all lower layers in the chain
-      // i.e. : `l/*sublayer1link*:l/*sublayer2link:l/*sublayer3link`
-      // lowest layer doesn't have any (empty lower)
-      const chain = layers.map((layer) => `l/${layer.link}`)
-      return layers.map((layer, key) => ({
-        ...layer,
-        lower: key > 0 ? chain.slice(0, key).join(":") : null,
-      }))
-    })
-    .flat()
+async function getLayers(manifests: ManifestInfosFromRegistry[]) {
+	console.log(`== getting Layers @getLayers == ${manifests}`);
+	return manifests
+		.map(({ diffIds, token }) => {
+			// loops on images and compute / generate values all layers
+			// use same `cache` and `link` in case of duplicated layers (layers with same chain_id in two images)
+			// note : we'll generate `cacheId` later when processing the layer and link back then
+			const computedLayers: Layer[] = [];
+			for (const key in diffIds) {
+				// TODO just use Object Keys in loop?
+				if (Object.prototype.hasOwnProperty.call(diffIds, key)) {
+					const diffId = diffIds[parseInt(key, 10)];
+					const chainId =
+						parseInt(key, 10) === 0
+							? diffId.split(':')[1]
+							: computeChainId({
+									previousChainId:
+										computedLayers[parseInt(key, 10) - 1].chainId,
+									diffId,
+							  });
+					const duplicateOf = computedLayers.find(
+						(layer) => layer.chain_id === chainId,
+					);
+					computedLayers.push({
+						token,
+						diffId,
+						chainId,
+						parent:
+							parseInt(key, 10) > 0
+								? computedLayers[parseInt(key, 10) - 1].chain_id
+								: null,
+						isDuplicate: Boolean(duplicateOf),
+						link: duplicateOf
+							? duplicateOf.link
+							: crypto.randomBytes(13).toString('hex').toUpperCase(),
+					} as Layer);
+				}
+			}
+			return computedLayers;
+		})
+		.map((layers: Layer[]) => {
+			// 7. compute the lower link chain
+			// `lower` chain is a string composed of the path to the `link` of all lower layers in the chain
+			// i.e. : `l/*sublayer1link*:l/*sublayer2link:l/*sublayer3link`
+			// lowest layer doesn't have (empty lower)
+			const chain = layers.map((layer) => `l/${layer.link}`);
+			return layers.map((layer, key) => ({
+				...layer,
+				lower: key > 0 ? chain.slice(0, key).join(':') : null,
+			}));
+		})
+		.flat();
 }
 
 /**
@@ -95,14 +131,21 @@ async function getLayers(manifests: any) {
  * @param {[Object]} manifests - array of distribution manifests with auth
  * @return {[Object]} layerUrls - array of layers blob digests with athentication token
  */
-const getLayerDistributionDigests = (manifests: any) => {
-  return manifests
-    .map(({ manifest, image_name, token }: any) =>
-      manifest.layers.map((layer: LayerRaw) => ({ image_name, token, compressedSize: layer.size, layer: layer.digest.split(":")[1] }))
-    )
-    .flat()
-    .filter((layer: Layer, index: number, layers: Layer[]) => layers.indexOf(layer) === index) // dedupe to prevent downloading twice layers shared across images
-}
+const getLayerDistributionDigests = (
+	manifests: ManifestInfosFromRegistry[],
+) => {
+	return manifests
+		.map(({ manifest, imageName, token }) =>
+			manifest.layers.map((layer: LayerRaw) => ({
+				imageName,
+				token,
+				compressedSize: layer.size,
+				layer: layer.digest.split(':')[1],
+			})),
+		)
+		.flat()
+		.filter((layer, index, layers) => layers.indexOf(layer) === index); // dedupe to prevent downloading twice layers shared across images
+};
 
 /**
  * Generate random 32 char lowercase `chain_id`
@@ -114,74 +157,101 @@ const getLayerDistributionDigests = (manifests: any) => {
  * As we don't want to keep the whole layer in memory, we'll hash while streaming (on the wire)
  * and link the `cache` with all layers having matching `diff_id` (there might be duplicate layers with same `diff_id` but different `chain_id`)
  */
-const getRandomDiffId = (): string => crypto.randomBytes(32).toString("hex")
+const getRandomDiffId = (): string => crypto.randomBytes(32).toString('hex');
 
 /**
  * Prepare files from layer metadata
- * */
-const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, cache_id }: Layer) => {
-  // compute useful paths
-  const dockerOverlay2CacheId = `docker/overlay2/${cache_id}`
-  const dockerOverlay2l = "docker/overlay2/l"
-  const dockerImageOverlay2LayerdbSha256 = "docker/image/overlay2/layerdb/sha256"
-  const dockerImageOverlay2LayerdbSha256ChainId = `${dockerImageOverlay2LayerdbSha256}/${chain_id}`
+ */
+const generateFilesForLayer = ({
+	chain_id,
+	diff_id,
+	parent,
+	lower,
+	link,
+	size,
+	cacheId,
+}: Layer) => {
+	// compute useful paths
+	const dockerOverlay2CacheId = `docker/overlay2/${cacheId}`;
+	const dockerOverlay2l = 'docker/overlay2/l';
+	const dockerImageOverlay2LayerdbSha256 =
+		'docker/image/overlay2/layerdb/sha256';
+	const dockerImageOverlay2LayerdbSha256ChainId = `${dockerImageOverlay2LayerdbSha256}/${chain_id}`;
 
-  const files = [
-    // `link` symlink from `l/_link_` to `../_cache_id_/diff`
-    {
-      header: {
-        name: `${dockerOverlay2l}/${link}`,
-        type: "symlink",
-        linkname: `../${cache_id}/diff`,
-      },
-    },
-    // emtpy `commited` file
-    {
-      header: { name: `${dockerOverlay2CacheId}/commited`, mode: 600 },
-      content: "",
-    },
-    // emtpy `work` directory
-    {
-      header: { name: `${dockerOverlay2CacheId}/work`, mode: 777, type: "directory" },
-    },
-    // `link` file
-    {
-      header: { name: `${dockerOverlay2CacheId}/link`, mode: 644 },
-      content: link,
-    },
-    // `diff` file
-    {
-      header: { name: `${dockerImageOverlay2LayerdbSha256ChainId}/diff`, mode: 755 },
-      content: diff_id,
-    },
-    // `cache_id` file
-    {
-      header: { name: `${dockerImageOverlay2LayerdbSha256ChainId}/cache-id`, mode: 755 },
-      content: cache_id,
-    },
-    // `size` file
-    {
-      header: { name: `${dockerImageOverlay2LayerdbSha256ChainId}/size`, mode: 755 },
-      content: String(size),
-    },
-  ]
+	const files = [
+		// `link` symlink from `l/_link_` to `../_cacheId_/diff`
+		{
+			header: {
+				name: `${dockerOverlay2l}/${link}`,
+				type: 'symlink',
+				linkname: `../${cacheId}/diff`,
+			},
+		},
+		// emtpy `commited` file
+		{
+			header: { name: `${dockerOverlay2CacheId}/commited`, mode: 600 },
+			content: '',
+		},
+		// emtpy `work` directory
+		{
+			header: {
+				name: `${dockerOverlay2CacheId}/work`,
+				mode: 777,
+				type: 'directory',
+			},
+		},
+		// `link` file
+		{
+			header: { name: `${dockerOverlay2CacheId}/link`, mode: 644 },
+			content: link,
+		},
+		// `diff` file
+		{
+			header: {
+				name: `${dockerImageOverlay2LayerdbSha256ChainId}/diff`,
+				mode: 755,
+			},
+			content: diff_id,
+		},
+		// `cacheId` file
+		{
+			header: {
+				name: `${dockerImageOverlay2LayerdbSha256ChainId}/cache-id`,
+				mode: 755,
+			},
+			content: cacheId,
+		},
+		// `size` file
+		{
+			header: {
+				name: `${dockerImageOverlay2LayerdbSha256ChainId}/size`,
+				mode: 755,
+			},
+			content: String(size),
+		},
+	];
 
-  // `parent` file; first layer doens't have any parent
-  if (parent)
-    files.push({
-      header: { name: `${dockerImageOverlay2LayerdbSha256ChainId}/parent`, mode: 755 },
-      content: parent,
-    })
+	// `parent` file; first layer doens't have parent
+	if (parent) {
+		files.push({
+			header: {
+				name: `${dockerImageOverlay2LayerdbSha256ChainId}/parent`,
+				mode: 755,
+			},
+			content: parent,
+		});
+	}
 
-  // `lower` chain; last layer doesn't have any lower
-  if (lower)
-    files.push({
-      header: { name: `${dockerOverlay2CacheId}/lower`, mode: 644 },
-      content: lower,
-    })
+	// `lower` chain; last layer doesn't have lower
+	if (lower) {
+		files.push({
+			header: { name: `${dockerOverlay2CacheId}/lower`, mode: 644 },
+			content: lower,
+		});
+	}
 
-  return files
-}
+	return files;
+};
 
 /** DownloadProcessLayers
  * // 8. download and process layers
@@ -200,51 +270,73 @@ const generateFilesForLayer = ({ chain_id, diff_id, parent, lower, link, size, c
  */
 
 interface ProcessLayerIn {
-  manifests: any[]
-  layers: Layer[]
-  packStream: Pack
-  injectPath: string
+	manifests: ManifestInfosFromRegistry[];
+	layers: Layer[];
+	packStream: Pack;
+	injectPath: string;
 }
 
-const downloadProcessLayers = async ({ manifests, layers, packStream, injectPath }: ProcessLayerIn) => {
-  console.log(`== Processing Layers @downloadProcessLayers ==`)
+const downloadProcessLayers = async ({
+	manifests,
+	layers,
+	packStream,
+	injectPath,
+}: ProcessLayerIn) => {
+	console.log(`== Processing Layers @downloadProcessLayers ==`);
 
-  const processingLayers = getLayerDistributionDigests(manifests)
-  const injectableFiles = []
+	const processingLayers = getLayerDistributionDigests(manifests);
+	const injectableFiles = [];
 
-  for (const key in processingLayers) {
-    const { layer, image_name, compressedSize, token } = processingLayers[key]
-    console.log(`=> ${parseInt(key) + 1} / ${processingLayers.length} : ${layer}`)
+	for (const key in processingLayers) {
+		if (Object.prototype.hasOwnProperty.call(processingLayers, key)) {
+			const { layer, imageName, compressedSize, token } = processingLayers[key];
+			console.log(
+				`=> ${parseInt(key, 10) + 1} / ${processingLayers.length} : ${layer}`,
+			);
 
-    try {
-      const cache_id = getRandomDiffId()
+			try {
+				const cacheId = getRandomDiffId();
 
-      // get the url
-      const { imageUrl } = getUrls(image_name)
+				// get the url
+				const { imageUrl } = getUrls(imageName);
 
-      // get the stream
-      const layerStream: any = await getBlob(imageUrl, token, { digest: `sha256:${layer}`, size: compressedSize })
+				// get the stream
+				const layerStream: NodeJS.ReadableStream = await getBlob(
+					imageUrl,
+					token,
+					{ digest: `sha256:${layer}`, size: compressedSize },
+				);
 
-      // process the stream and get back `size` (uncompressed) and `diff_id` (digest)
-      const { size, diff_id }: LayerMeta = await layerStreamProcessing({ layerStream, packStream, cache_id, injectPath })
+				// process the stream and get back `size` (uncompressed) and `diff_id` (digest)
+				const { size, diff_id }: LayerMeta = await layerStreamProcessing({
+					layerStream,
+					packStream,
+					cacheId,
+					injectPath,
+				});
 
-      // find all layers related to this archive
-      const relatedLayers = layers.filter((layer: Layer) => layer.diff_id === diff_id)
+				// find all layers related to this archive
+				const relatedLayers = layers.filter(
+					(layerRelated: Layer) => layerRelated.diff_id === diff_id,
+				);
 
-      // create the metadata and link files for all related layers
-      for (const layer of relatedLayers) {
-        injectableFiles.push(generateFilesForLayer({ ...layer, size, cache_id }))
-      }
-    } catch (error) {
-      console.log("downloadProcessLayers CATCH", error)
-    }
-  }
-  return injectableFiles.flat()
-}
+				// create the metadata and link files for all related layers
+				for (const layerRelated of relatedLayers) {
+					injectableFiles.push(
+						generateFilesForLayer({ ...layerRelated, size, cacheId }),
+					);
+				}
+			} catch (error) {
+				console.log('downloadProcessLayers CATCH', error);
+			}
+		}
+	}
+	return injectableFiles.flat();
+};
 
 interface ComputeChainInput {
-  previousChainId: string
-  diff_id: string
+	previousChainId: string;
+	diffId: string;
 }
 /** Compute Chain Id
  *
@@ -252,76 +344,104 @@ interface ComputeChainInput {
  * i.e. sha256("sha256:e265835b28ac16782ef429b44427c7a72cdefc642794515d78a390a72a2eab42 sha256:573a4eb582cc8a741363bc2f323baf020649960822435922c50d956e1b22a787")
  *
  */
-const computeChainId = ({ previousChainId, diff_id }: ComputeChainInput): string =>
-  crypto.createHash("sha256").update(`sha256:${previousChainId} ${diff_id}`).digest("hex")
+const computeChainId = ({
+	previousChainId,
+	diffId,
+}: ComputeChainInput): string =>
+	crypto
+		.createHash('sha256')
+		.update(`sha256:${previousChainId} ${diffId}`)
+		.digest('hex');
 
 interface LayerStreamInput {
-  layerStream: NodeJS.ReadableStream
-  packStream: Pack
-  cache_id: string
-  injectPath: string
+	layerStream: NodeJS.ReadableStream;
+	packStream: Pack;
+	cacheId: string;
+	injectPath: string;
 }
 
 /**
  * Promise : Layer Stream Processing
  */
-async function layerStreamProcessing({ layerStream, packStream, cache_id, injectPath }: LayerStreamInput): Promise<LayerMeta> {
-  const extract = tar.extract()
+async function layerStreamProcessing({
+	layerStream,
+	packStream,
+	cacheId,
+	injectPath,
+}: LayerStreamInput): Promise<LayerMeta> {
+	const extract = tar.extract();
 
-  // Promisify the event based control flow
-  return new Promise((resolve) => {
-    // 0. Setup the digester
-    const layerMeta: LayerMeta = {
-      diff_id: null,
-      size: -1,
-    }
+	// Promisify the event based control flow
+	return new Promise((resolve) => {
+		// 0. Setup the digester
+		const layerMeta: LayerMeta = {
+			diff_id: null,
+			size: -1,
+		};
 
-    const digesterCb = (resultDigest: string, length: number): void => {
-      // logger.log(`=> digesterCb resultDigest: ${resultDigest}, ${length}`, packStream, cache_id)
-      layerMeta.diff_id = `sha256:${resultDigest}`
-      layerMeta.size = length
-    }
+		const digesterCb = (resultDigest: string, length: number): void => {
+			// logger.log(`=> digesterCb resultDigest: ${resultDigest}, ${length}`, packStream, cacheId)
+			layerMeta.diff_id = `sha256:${resultDigest}`;
+			layerMeta.size = length;
+		};
 
-    const digester = digestStream(digesterCb)
+		const digester = digestStream(digesterCb);
 
-    // 4. tar extract happens here
-    extract.on("entry", (header: Headers & { pax: any }, stream: NodeJS.ReadableStream, next: Function) => {
-      if (header.pax) {
-        /**
-         * DELETE header.pax here, if it exists, as it is causing problems with the symlink handling.
-         * header.pax overrides over the from/to name path for the symlinks so ends up at root level
-         */
-        console.log(`=> @layerStreamProcessing header ${inspect(header, true, 2, true)}`)
-        delete header.pax
-      }
+		// 4. tar extract happens here
+		extract.on(
+			'entry',
+			(
+				header: Headers & { pax: any },
+				stream: NodeJS.ReadableStream,
+				next: () => void,
+			) => {
+				if (header.pax) {
+					/**
+					 * DELETE header.pax here, if it exists, as it is causing problems with the symlink handling.
+					 * header.pax overrides over the from/to name path for the symlinks so ends up at root level
+					 */
+					console.log(
+						`=> @layerStreamProcessing header ${inspect(
+							header,
+							true,
+							2,
+							true,
+						)}`,
+					);
+					delete header.pax;
+				}
 
-      // change the name of the file to place it at the right position in tar archive folder tree
-      const headerNewName = { ...header, name: `${injectPath}/docker/overlay2/${cache_id}/diff/${header.name}` }
+				// change the name of the file to place it at the right position in tar archive folder tree
+				const headerNewName = {
+					...header,
+					name: `${injectPath}/docker/overlay2/${cacheId}/diff/${header.name}`,
+				};
 
-      // 5. change header name to give file its destination folder in the output tarball
-      const filePack = packStream.entry(headerNewName)
+				// 5. change header name to give file its destination folder in the output tarball
+				const filePack = packStream.entry(headerNewName);
 
-      stream.pipe(filePack)
+				stream.pipe(filePack);
 
-      // TODO: better error handling
+				// TODO: better error handling
 
-      // we cannot just wait on the readable stream to end (stream) but for writable one to finish before processing the next file
-      filePack.on("finish", () => {
-        next()
-      })
-    })
+				// we cannot just wait on the readable stream to end (stream) but for writable one to finish before processing the next file
+				filePack.on('finish', () => {
+					next();
+				});
+			},
+		);
 
-    // 7. when this layer finish extraction, we get the digest (diff_id) and size from the digester
-    // then resolve the promise to allow moving on to the next layer
-    extract.on("finish", () => {
-      resolve(layerMeta)
-    })
+		// 7. when this layer finish extraction, we get the digest (diff_id) and size from the digester
+		// then resolve the promise to allow moving on to the next layer
+		extract.on('finish', () => {
+			resolve(layerMeta);
+		});
 
-    layerStream
-      .pipe(gunzip()) // 1. uncompress if necessary, will pass thru if it's not gziped
-      .pipe(digester) // 2. compute hash and forward (this is a continuous process we'll get the result at the end)
-      .pipe(extract) // 3. extract from the layer tar archive (generate `entry` events cf 4.)
-  })
+		layerStream
+			.pipe(gunzip()) // 1. uncompress if necessary, will pass thru if it's not gziped
+			.pipe(digester) // 2. compute hash and forward (this is a continuous process we'll get the result at the end)
+			.pipe(extract); // 3. extract from the layer tar archive (generate `entry` events cf 4.)
+	});
 }
 
-export { getLayers, downloadProcessLayers }
+export { getLayers, downloadProcessLayers };

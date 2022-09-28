@@ -1,4 +1,16 @@
-import tar, { Pack, Headers } from "tar-stream"
+import tar, { Pack, Headers } from 'tar-stream';
+
+export interface AugmentedHeadersFile extends Headers {
+	name: string;
+	mode?: number;
+}
+
+export interface AugmentedHeadersSymlink extends Headers {
+	name: string;
+	type: 'symlink';
+	linkname: string;
+	mode?: number;
+}
 
 /**
  * PromisePacker
@@ -11,19 +23,25 @@ import tar, { Pack, Headers } from "tar-stream"
  * @param {string} value - tar-stream.pack.entry value
  * @param {function} cb - optional callback to call after packing the entry
  * @returns {Promise}
- * */
-const promisePacker = (pack: Pack, injectFolder?: string) => (header: Headers, value: any) =>
-  new Promise((resolve, reject) => {
-    if (header.name.includes("sha256:")) {
-      console.log(`=> FIXME!! pack header.name: ${header.name}`)
-    }
-    // add the root injectable folder in front of the name when injecting files
-    if (injectFolder) header.name = `${injectFolder}/${header.name}`
-    pack.entry(header, value, (error) => {
-      if (error) reject(error)
-      resolve(true)
-    })
-  })
+ */
+const promisePacker =
+	(pack: Pack, injectFolder?: string) =>
+	(header: AugmentedHeadersSymlink | AugmentedHeadersFile, value?: string) =>
+		new Promise((resolve, reject) => {
+			if (header.name.includes('sha256:')) {
+				console.log(`=> FIXME!! pack header.name: ${header.name}`);
+			}
+			// add the root injectable folder in front of the name when injecting files
+			if (injectFolder) {
+				header.name = `${injectFolder}/${header.name}`;
+			}
+			pack.entry(header, value, (error) => {
+				if (error) {
+					reject(error);
+				}
+				resolve(true);
+			});
+		});
 
 /**
  * Streamable tar packer
@@ -32,10 +50,10 @@ const promisePacker = (pack: Pack, injectFolder?: string) => (header: Headers, v
  * @returns Streamable tar packer
  */
 const getTarballStream = (outputStream: NodeJS.WritableStream): Pack => {
-  // logger.log(`=> prepareTarball outputStream: ${inspect(outputStream,true,5,true)}`)
-  const pack = tar.pack()
-  pack.pipe(outputStream)
-  return pack
-}
+	// logger.log(`=> prepareTarball outputStream: ${inspect(outputStream,true,5,true)}`)
+	const pack = tar.pack();
+	pack.pipe(outputStream);
+	return pack;
+};
 
-export { promisePacker, getTarballStream }
+export { promisePacker, getTarballStream };

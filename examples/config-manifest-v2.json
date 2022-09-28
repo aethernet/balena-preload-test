@@ -1,0 +1,276 @@
+{
+    "architecture": "arm64",
+    "config": {
+      "Hostname": "",
+      "Domainname": "",
+      "User": "",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LC_ALL=C.UTF-8",
+            "DEBIAN_FRONTEND=noninteractive",
+            "UDEV=1",
+            "NODE_VERSION=16.14.0",
+            "YARN_VERSION=1.22.4"
+        ],
+      "Cmd": [
+            "npm",
+            "start"
+        ],
+      "Image": "sha256:f53dc523b2778cd57fe8a248b0cc210515611d20a73cfa77648ea1f361c1353e",
+      "Volumes": null,
+      "WorkingDir": "/usr/src/app",
+      "Entrypoint": [
+            "/usr/bin/entry.sh"
+        ],
+      "OnBuild": null,
+      "Labels": {
+            "io.balena.architecture": "aarch64",
+            "io.balena.device-type": "raspberrypi3-64",
+            "io.balena.qemu.version": "6.0.0+balena1-aarch64"
+        }
+    },
+    "container": "cefcfc318a1cfa5c04b287c4279d9eb3e430f73c9fc47b507adb5e327363a5db",
+    "container_config": {
+      "Hostname": "cefcfc318a1c",
+      "Domainname": "",
+      "User": "",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LC_ALL=C.UTF-8",
+            "DEBIAN_FRONTEND=noninteractive",
+            "UDEV=1",
+            "NODE_VERSION=16.14.0",
+            "YARN_VERSION=1.22.4"
+        ],
+      "Cmd": [
+            "/bin/sh",
+            "-c",
+            "#(nop) ",
+            "CMD [\"npm\" \"start\"]"
+        ],
+      "Image": "sha256:f53dc523b2778cd57fe8a248b0cc210515611d20a73cfa77648ea1f361c1353e",
+      "Volumes": null,
+      "WorkingDir": "/usr/src/app",
+      "Entrypoint": [
+            "/usr/bin/entry.sh"
+        ],
+      "OnBuild": null,
+      "Labels": {
+            "io.balena.architecture": "aarch64",
+            "io.balena.device-type": "raspberrypi3-64",
+            "io.balena.qemu.version": "6.0.0+balena1-aarch64"
+        }
+    },
+    "created": "2022-07-16T00:18:16.287045962Z",
+    "docker_version": "dev",
+    "history": [
+        {
+        "created": "2022-03-01T02:11:29.380180487Z",
+        "created_by": "/bin/sh -c #(nop) ADD file:9816c9c29627693c34afda4fa5e1a5e8a0f5aa3c5d5cfd920a4d89c77aab997d in / "
+        },
+        {
+        "created": "2022-03-01T02:11:30.271306483Z",
+        "created_by": "/bin/sh -c #(nop)  CMD [\"bash\"]",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:18:40.223033904Z",
+        "created_by": "/bin/sh -c #(nop)  LABEL io.balena.architecture=aarch64",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:18:40.341708089Z",
+        "created_by": "/bin/sh -c #(nop)  LABEL io.balena.qemu.version=6.0.0+balena1-aarch64",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:18:40.487352119Z",
+        "created_by": "/bin/sh -c #(nop) COPY file:7353f372ff61bdb7912d066133342b42574654e84a449f33324744e49d09ec13 in /usr/bin "
+        },
+        {
+        "created": "2022-03-05T03:20:04.968188935Z",
+        "created_by": "/bin/sh -c apt-get update && apt-get install -y --no-install-recommends   sudo   ca-certificates   findutils   gnupg   dirmngr   inetutils-ping   netbase   curl   udev   procps   $(       if apt-cache show 'iproute' 2>/dev/null | grep -q '^Version:'; then         echo 'iproute';       else         echo 'iproute2';       fi   )   && rm -rf /var/lib/apt/lists/*   && c_rehash   && echo '#!/bin/sh\\nset -e\\nset -u\\nexport DEBIAN_FRONTEND=noninteractive\\nn=0\\nmax=2\\nuntil [ $n -gt $max ]; do\\n  set +e\\n  (\\n    apt-get update -qq &&\\n    apt-get install -y --no-install-recommends \"$@\"\\n  )\\n  CODE=$?\\n  set -e\\n  if [ $CODE -eq 0 ]; then\\n    break\\n  fi\\n  if [ $n -eq $max ]; then\\n    exit $CODE\\n  fi\\n  echo \"apt failed, retrying\"\\n  n=$(($n + 1))\\ndone\\nrm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*' > /usr/sbin/install_packages   && chmod 0755 \"/usr/sbin/install_packages\""
+        },
+        {
+        "created": "2022-03-05T03:24:21.924185496Z",
+        "created_by": "/bin/sh -c curl -SLO \"http://resin-packages.s3.amazonaws.com/resin-xbuild/v1.0.0/resin-xbuild1.0.0.tar.gz\"   && echo \"1eb099bc3176ed078aa93bd5852dbab9219738d16434c87fc9af499368423437  resin-xbuild1.0.0.tar.gz\" | sha256sum -c -   && tar -xzf \"resin-xbuild1.0.0.tar.gz\"   && rm \"resin-xbuild1.0.0.tar.gz\"   && chmod +x resin-xbuild   && mv resin-xbuild /usr/bin   && ln -sf resin-xbuild /usr/bin/cross-build-start   && ln -sf resin-xbuild /usr/bin/cross-build-end"
+        },
+        {
+        "created": "2022-03-05T03:24:22.029766712Z",
+        "created_by": "/bin/sh -c #(nop)  ENV LC_ALL=C.UTF-8",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:24:22.13577856Z",
+        "created_by": "/bin/sh -c #(nop)  ENV DEBIAN_FRONTEND=noninteractive",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:24:22.261880426Z",
+        "created_by": "/bin/sh -c #(nop)  ENV UDEV=off",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:24:22.725661444Z",
+        "created_by": "/bin/sh -c echo 'path-exclude /usr/share/doc/*\\npath-include /usr/share/doc/*/copyright\\npath-exclude /usr/share/man/*\\npath-exclude /usr/share/groff/*\\npath-exclude /usr/share/info/*\\npath-exclude /usr/share/lintian/*\\npath-exclude /usr/share/linda/*\\npath-exclude /usr/share/locale/*\\npath-include /usr/share/locale/en*' > /etc/dpkg/dpkg.cfg.d/01_nodoc"
+        },
+        {
+        "created": "2022-03-05T03:24:23.177356933Z",
+        "created_by": "/bin/sh -c echo 'APT::Get::Assume-Yes \"true\";\\nAPT::Install-Recommends \"0\";\\nAPT::Install-Suggests \"0\";\\nquiet \"true\";' > /etc/apt/apt.conf.d/01_buildconfig"
+        },
+        {
+        "created": "2022-03-05T03:24:23.660791745Z",
+        "created_by": "/bin/sh -c mkdir -p /usr/share/man/man1",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:24:23.770550451Z",
+        "created_by": "/bin/sh -c #(nop) COPY file:c9829a478f08de5dc03a268d90f0d89cdee4fd7f4c87d45a6b6764d70cafa92d in /usr/bin/entry.sh "
+        },
+        {
+        "created": "2022-03-05T03:24:23.873194136Z",
+        "created_by": "/bin/sh -c #(nop) COPY file:207cdc191bada5970fb21d3481971b4a391e6e52061bd584dc75404c36d01fcf in /usr/bin/balena-info "
+        },
+        {
+        "created": "2022-03-05T03:24:23.976698565Z",
+        "created_by": "/bin/sh -c #(nop) COPY file:def7f364bfe93992865dfba2017def9a3c407b6cf8ac0233dcd0aabaa9e4b75b in /usr/bin/balena-idle "
+        },
+        {
+        "created": "2022-03-05T03:24:24.076531999Z",
+        "created_by": "/bin/sh -c #(nop)  ENTRYPOINT [\"/usr/bin/entry.sh\"]",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-05T03:24:25.00804667Z",
+        "created_by": "/bin/sh -c curl -SLO \"https://raw.githubusercontent.com/balena-io-library/base-images/a95300eda2320833e537ca20d728a870bf02177d/scripts/assets/tests/test-os.sh\"   && echo \"Running test-os\"   && chmod +x test-os.sh   && bash test-os.sh debian bullseye   && rm -rf test-os.sh"
+        },
+        {
+        "created": "2022-03-05T03:24:25.494675947Z",
+        "created_by": "/bin/sh -c [ ! -d /.balena/messages ] && mkdir -p /.balena/messages; echo 'Here are a few details about this Docker image (For more information please visit https://www.balena.io/docs/reference/base-images/base-images/): \\nArchitecture: ARM v8 \\nOS: Debian Bullseye \\nVariant: run variant \\nDefault variable(s): UDEV=off \\nExtra features: \\n- Easy way to install packages with `install_packages <package-name>` command \\n- Run anywhere with cross-build feature  (for ARM only) \\n- Keep the container idling with `balena-idle` command \\n- Show base image details with `balena-info` command' > /.balena/messages/image-info"
+        },
+        {
+        "created": "2022-03-05T03:24:26.000288044Z",
+        "created_by": "/bin/sh -c echo '#!/bin/sh.real\\nbalena-info\\nrm -f /bin/sh\\ncp /bin/sh.real /bin/sh\\n/bin/sh \"$@\"' > /bin/sh-shim \t&& chmod +x /bin/sh-shim \t&& cp /bin/sh /bin/sh.real \t&& mv /bin/sh-shim /bin/sh"
+        },
+        {
+        "created": "2022-03-07T08:01:12.989701875Z",
+        "created_by": "/bin/sh -c #(nop)  LABEL io.balena.device-type=raspberrypi3-64",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-07T08:01:23.383551784Z",
+        "created_by": "/bin/sh -c echo \"deb http://archive.raspberrypi.org/debian bullseye main ui\" >>  /etc/apt/sources.list.d/raspi.list \t&& apt-key adv --batch --keyserver keyserver.ubuntu.com  --recv-key 0x82B129927FA3303E"
+        },
+        {
+        "created": "2022-03-07T08:01:59.967221122Z",
+        "created_by": "/bin/sh -c apt-get update && apt-get install -y --no-install-recommends \t\tless \t\tlibraspberrypi-bin \t\tkmod \t\tnano \t\tnet-tools \t\tifupdown \t\tiputils-ping \t\ti2c-tools \t\tusbutils \t&& rm -rf /var/lib/apt/lists/*"
+        },
+        {
+        "created": "2022-03-07T08:02:00.897228079Z",
+        "created_by": "/bin/sh -c [ ! -d /.balena/messages ] && mkdir -p /.balena/messages; echo 'Here are a few details about this Docker image (For more information please visit https://www.balena.io/docs/reference/base-images/base-images/): \\nArchitecture: ARM v8 \\nOS: Debian Bullseye \\nVariant: run variant \\nDefault variable(s): UDEV=off \\nExtra features: \\n- Easy way to install packages with `install_packages <package-name>` command \\n- Run anywhere with cross-build feature  (for ARM only) \\n- Keep the container idling with `balena-idle` command \\n- Show base image details with `balena-info` command' > /.balena/messages/image-info"
+        },
+        {
+        "created": "2022-03-07T08:02:01.426862021Z",
+        "created_by": "/bin/sh -c echo '#!/bin/sh.real\\nbalena-info\\nrm -f /bin/sh\\ncp /bin/sh.real /bin/sh\\n/bin/sh \"$@\"' > /bin/sh-shim \t&& chmod +x /bin/sh-shim \t&& cp /bin/sh /bin/sh.real \t&& mv /bin/sh-shim /bin/sh"
+        },
+        {
+        "created": "2022-03-12T18:46:18.063996357Z",
+        "created_by": "/bin/sh -c #(nop)  ENV NODE_VERSION=16.14.0",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-12T18:46:18.232460695Z",
+        "created_by": "/bin/sh -c #(nop)  ENV YARN_VERSION=1.22.4",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-12T18:49:13.610719525Z",
+        "created_by": "/bin/sh -c buildDeps='curl libatomic1' \t&& set -x \t&& for key in \t6A010C5166006599AA17F08146C2130DFD2497F5 \t; do \t\tgpg --batch --keyserver pgp.mit.edu --recv-keys \"$key\" || \t\tgpg --batch --keyserver keyserver.pgp.com --recv-keys \"$key\" || \t\tgpg --batch --keyserver keyserver.ubuntu.com --recv-keys \"$key\" ; \tdone \t&& apt-get update && apt-get install -y $buildDeps --no-install-recommends \t&& rm -rf /var/lib/apt/lists/* \t&& curl -SLO \"http://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-arm64.tar.gz\" \t&& echo \"82d71968c82eb391f463df62ba277563a3bd01ce43bba0e7e1c533991567b8fe  node-v$NODE_VERSION-linux-arm64.tar.gz\" | sha256sum -c - \t&& tar -xzf \"node-v$NODE_VERSION-linux-arm64.tar.gz\" -C /usr/local --strip-components=1 \t&& rm \"node-v$NODE_VERSION-linux-arm64.tar.gz\" \t&& curl -fSLO --compressed \"https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz\" \t&& curl -fSLO --compressed \"https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc\" \t&& gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \t&& mkdir -p /opt/yarn \t&& tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/yarn --strip-components=1 \t&& ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn \t&& ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \t&& rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \t&& npm config set unsafe-perm true -g --unsafe-perm \t&& rm -rf /tmp/*"
+        },
+        {
+        "created": "2022-03-12T18:49:14.705207155Z",
+        "created_by": "/bin/sh -c #(nop)  CMD [\"echo\" \"'No CMD command was set in Dockerfile! Details about CMD command could be found in Dockerfile Guide section in our Docs. Here's the link: https://balena.io/docs\"]",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-03-12T18:49:18.02160827Z",
+        "created_by": "/bin/sh -c curl -SLO \"https://raw.githubusercontent.com/balena-io-library/base-images/8accad6af708fca7271c5c65f18a86782e19f877/scripts/assets/tests/test-stack@node.sh\"   && echo \"Running test-stack@node\"   && chmod +x test-stack@node.sh   && bash test-stack@node.sh   && rm -rf test-stack@node.sh"
+        },
+        {
+        "created": "2022-03-12T18:49:18.555807073Z",
+        "created_by": "/bin/sh -c [ ! -d /.balena/messages ] && mkdir -p /.balena/messages; echo 'Here are a few details about this Docker image (For more information please visit https://www.balena.io/docs/reference/base-images/base-images/): \\nArchitecture: ARM v8 \\nOS: Debian Bullseye \\nVariant: run variant \\nDefault variable(s): UDEV=off \\nThe following software stack is preinstalled: \\nNode.js v16.14.0, Yarn v1.22.4 \\nExtra features: \\n- Easy way to install packages with `install_packages <package-name>` command \\n- Run anywhere with cross-build feature  (for ARM only) \\n- Keep the container idling with `balena-idle` command \\n- Show base image details with `balena-info` command' > /.balena/messages/image-info"
+        },
+        {
+        "created": "2022-03-12T18:49:19.120356118Z",
+        "created_by": "/bin/sh -c echo '#!/bin/sh.real\\nbalena-info\\nrm -f /bin/sh\\ncp /bin/sh.real /bin/sh\\n/bin/sh \"$@\"' > /bin/sh-shim \t&& chmod +x /bin/sh-shim \t&& cp /bin/sh /bin/sh.real \t&& mv /bin/sh-shim /bin/sh"
+        },
+        {
+        "created": "2022-07-16T00:17:52.760379046Z",
+        "created_by": "/bin/sh -c #(nop) WORKDIR /usr/src/app"
+        },
+        {
+        "created": "2022-07-16T00:17:52.819224531Z",
+        "created_by": "/bin/sh -c #(nop) COPY file:31b62784b2943119dcb4a6e0f18d8ab925598c68b9309c6f7852b376a3d51764 in ./ "
+        },
+        {
+        "created": "2022-07-16T00:18:15.960823314Z",
+        "created_by": "/bin/sh -c JOBS=MAX npm install --production --unsafe-perm && npm cache verify && rm -rf /tmp/*"
+        },
+        {
+        "created": "2022-07-16T00:18:16.159362445Z",
+        "created_by": "/bin/sh -c #(nop) COPY dir:5d40657711ec8b90304a7f8e6c690f5e8836a02c62d666aae5ef90703b4baf50 in ./ "
+        },
+        {
+        "created": "2022-07-16T00:18:16.229289098Z",
+        "created_by": "/bin/sh -c #(nop)  ENV UDEV=1",
+        "empty_layer": true
+        },
+        {
+        "created": "2022-07-16T00:18:16.287045962Z",
+        "created_by": "/bin/sh -c #(nop)  CMD [\"npm\" \"start\"]",
+        "empty_layer": true
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+      "type": "layers",
+      "diff_ids": [
+            "sha256:5089aa3c97a8aebeac8ad0cb2d089f8e7e487f0299a248f34cf46ab86a1a356d",
+            "sha256:07780d962759a3d70afeae81e6bac2051fa65a4fcee541e5ae999159f1a862f6",
+            "sha256:27872a7aa5c5dfdbeaddc17641908340cd3427d6edd195e102cd905c0bc1d9de",
+            "sha256:682f4d1fb2579dc11dca835ae3eb943447040923013ae832dddf3c25e659d303",
+            "sha256:f8f729762cc91ad6bc21fca063a73a9ab1cf258f9ade5496cecf4115a3992cc4",
+            "sha256:8f7c70c90aa8b6d00565f42ef1433e8a4d306f3f94df8b197b6f7a8c68d2f74d",
+            "sha256:bc5cd97d0653b038612e87191b42dd9a277c9f6c6caedf02cefaeff8621caa58",
+            "sha256:ab38302d8739efa03bbdf56b111903009c20503260b5ebed8f2e8636456bdfdb",
+            "sha256:1c40287e43e406673e5296a2d878ba9e45ec90ab84148fed718e0c4a073bbba0",
+            "sha256:5840c5fde9076a06d8ca6f27a75f38b638fa431953e6b0f8aab0676a0f5fff7a",
+            "sha256:b45d5222495bd457590bc48813304f6c2122ddd16b61179132f22bc98f722840",
+            "sha256:9ba964ae60aeb577387cd2cf5d60396bcb2b1cb7b26af14c377248d99b590f53",
+            "sha256:fc9cd64e5d371a969a8d0e5e756e6c72f3f8cd72d895e28d3ab27e83687ea3f2",
+            "sha256:953c80e8e0d11fddf0a93e55210f34f97d3877b48aedb020dd1ae3140140861f",
+            "sha256:0408d3df8f00fc2cdfb6302cc5b2ca8be3a9e1240ad3dd0eb8aa38aab0a6aa59",
+            "sha256:16118083e8582bac64b6ad1ddaee4db1c7f3c72992ad9d199ba2b3a37bd1208b",
+            "sha256:7d1637c560d5fc1b0739acafbd15c5d8b79087aeb9224f9f7c1f643bd7036af8",
+            "sha256:ccd8ba09b237631573e828dc148b70fb56f6ff5e5fe6094d0998f75896e17ba8",
+            "sha256:99dd29d603af496a3836eda91343008e301221ff7b94d8efbb68a1aa9acf7b21",
+            "sha256:57509b271726eb2f24d86525b48fec719fb59eac78ca915ce866818939f56f14",
+            "sha256:e37f551f0ff53ee9886a35996762e73488dac21e07d247e3d1127e9e8c92ebeb",
+            "sha256:7e192031075434104a168b75168636a63ce39c97e057367b0c135510e8b03f1e",
+            "sha256:f67dad0cf32548b53ce7113e39992987fa2aa32f2b59b5fc54dccb3e4f649153",
+            "sha256:93e85cbb5dac767a698d692dedfb221a47df038fa2272082dab3270a52427af0"
+        ]
+    }
+}
