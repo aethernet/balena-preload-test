@@ -91,11 +91,12 @@ const streamPreloadingAssets = async ({
 	// Beware that knowing the file size in advance is mandatory
 	const baseImageStreamEntry = packStream.entry({
 		// TOOD: name: `${balenaosRef}.img`, // switch when inject.mjs select baseimage from manifest (currently hardcoded)
-		name: 'image.img',
+		name: `${balenaosRef}.gz`,
 		mode: 644,
 		size: balenaosSize,
 	});
 
+	// TODO: optimizatinon : // streamBaseImage with all the metadata retrieval and processing (up to getLayers)
 	await streamBaseImage({
 		pipeStreamFrom: balenaosStream,
 		pipeStreamTo: baseImageStreamEntry,
@@ -177,7 +178,7 @@ const streamPreloadingAssets = async ({
 	}
 
 	// close tarball
-	packStream.finalize();
+	await packStream.finalize();
 	console.log('==> FINISHED @streamPreloadingAssets');
 	console.log(
 		'==> change consoleLevel log levels in logger.mjs for less verbose logging',

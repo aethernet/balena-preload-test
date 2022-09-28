@@ -1,14 +1,15 @@
 import { streamPreloadingAssets } from "./lib/streamPreloadingAssets"
 import "dotenv/config"
 import fsx from "fs-extra"
+console.log('STARTING PRELOADING');
 
-const appId = process.env.APPID
+const appId = process.env.APPID;
 const releaseId = process.env.RELEASEID
 const balenaosRef = process.env.BALENAOS
 const tarball = process.env.TARBALL!;
 const dataPartition = parseInt(process.env.DATA_PARTITION!, 10);
 const supervisorVersion = process.env.SV_VERSION
-const arch = process.env.ARCH
+const arch = process.env.ARCH;
 const baseImage = process.env.BASEIMAGE!;
 const api = process.env.API
 const token = process.env.API_TOKEN
@@ -48,5 +49,3 @@ balenaosStream.on("open", async () => {
     callback: () => {},
   })
 })
-
-console.log(`=== Your tarball is ready : ${tarball} ===`)

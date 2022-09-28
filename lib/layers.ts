@@ -387,10 +387,14 @@ async function layerStreamProcessing({
 
 		const digester = digestStream(digesterCb);
 
-		// 4. tar extracted happens here
+		// 4. tar extract happens here
 		extract.on(
 			'entry',
-			(header: Headers & { pax?: string }, stream: NodeJS.ReadableStream) => {
+			(
+				header: Headers & { pax: any },
+				stream: NodeJS.ReadableStream,
+				next: () => void,
+			) => {
 				if (header.pax) {
 					/**
 					 * DELETE header.pax here, if it exists, as it is causing problems with the symlink handling.
@@ -414,11 +418,20 @@ async function layerStreamProcessing({
 				};
 
 				// 5. change header name to give file its destination folder in the output tarball
-				stream.pipe(packStream.entry(headerNewName));
+				const filePack = packStream.entry(headerNewName);
+
+				stream.pipe(filePack);
+
+				// TODO: better error handling
+
+				// we cannot just wait on the readable stream to end (stream) but for writable one to finish before processing the next file
+				filePack.on('finish', () => {
+					next();
+				});
 			},
 		);
 
-		// 7. when this layer finished extraction, we get the digest (diff_id) and size from the digester
+		// 7. when this layer finish extraction, we get the digest (diff_id) and size from the digester
 		// then resolve the promise to allow moving on to the next layer
 		extract.on('finish', () => {
 			resolve(layerMeta);

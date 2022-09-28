@@ -74,7 +74,6 @@ const cleanup = () => {
     } catch (err) {}
   }
 }
-
 const cleanupErr = (err, cb) => {
   if (err) {
     console.error(err)
@@ -137,81 +136,138 @@ const lazyFs = async (partitionNo) => {
 }
 const writeStreams = []
 const onMember = async (header, stream, next) => {
-  writeStreams.push(EventEmitter.once(stream, "end"))
-  let [directive, partitionNo, ...parts] = header.name.split("/")
-  if (!parts[0]) {
-    return next()
-  }
-  partitionNo = Number(partitionNo)
-  if (isNaN(partitionNo)) cleanupErr(`inject subdirectory must be a partition number, got ${partitionNo}`)
-  if (!partitions[partitionNo]) cleanupErr(`partition ${partitionNo} not found.`)
-  if (directive !== "inject") cleanupErr(`Directory '${directive}' not recognized.`)
+  await write(header, stream)
+  next()
+}
 
-  const fs = await lazyFs(partitionNo)
-  let dir = ""
-  for (const part of parts.slice(0, parts.length - 1)) {
-    dir += "/" + part
-    try {
-      const stat = await fs.stat(dir)
-      if (!stat.isDirectory()) cleanupErr(`ENOTDIR: ${dir} is not a directory.`)
-    } catch (err) {
-      if (err.code === "ENOENT") {
-        await fs.mkdir(dir)
-      }
+const write = (header, stream) =>
+  new Promise(async (resolve, reject) => {
+    // we should stop on write end not stream end
+    // stream.on("end", resolve(true))
+
+    let [directive, partitionNo, ...parts] = header.name.split("/")
+    if (!parts[0]) {
+      reject("no path")
     }
-  }
-  const p = `/${parts.join("/")}`
-  console.error(`${partitionNo}:${p}`)
-  if (header.type === "directory") {
-    try {
-      const stat = await fs.stat(p)
-      if (!stat.isDirectory()) cleanupErr(`EEXIST: ${p} exists and is not a directory.`)
-    } catch (err) {
-      if (err.code === "ENOENT") await fs.mkdir(p)
-      cleanupErr(err.message)
-    }
-    const fh = await fs.open(p, "r+")
-    await fh.chown(header.uid, header.gid)
-    await fh.chmod(header.mode)
-    await fh.close()
-    next()
-  } else if (header.type === "symlink") {
-    try {
-      const stat = await fs.lstat(p)
-      if (!stat.isSymbolicLink()) cleanupErr(`EEXIST: ${p} exists and is not a symlink`)
-      if ((await fs.readlink(p)) !== header.linkname) cleanupErr(`EEXIST: ${p} exists. If overwrite is desired, please file an issue.`)
-      await fh.chown(header.uid, header.gid)
-      await fh.chmod(header.mode)
-      await fh.close()
-    } catch (err) {
-      if (err.code === "ENOENT") await fs.symlink(header.linkname, p)
-      else cleanupErr(err.message)
-    }
-    next()
-  } else if (header.type === "file") {
-    if (header.name.includes("ca-certificates.crt")) {
-      console.log("skipping file")
-      next()
-    } else {
+
+    partitionNo = Number(partitionNo)
+
+    if (isNaN(partitionNo)) cleanupErr(`inject subdirectory must be a partition number, got ${partitionNo}`)
+    if (!partitions[partitionNo]) cleanupErr(`partition ${partitionNo} not found.`)
+    if (directive !== "inject") cleanupErr(`Directory '${directive}' not recognized.`)
+
+    // lazyFS will get our partition and create the folder structure if required
+    const fs = await lazyFs(partitionNo)
+    let dir = ""
+    for (const part of parts.slice(0, parts.length - 1)) {
+      dir += "/" + part
       try {
-        await fs.stat(p)
-        cleanupErr(`EEXIST: ${p} exists. Refusing to overwrite`)
+        const stat = await fs.stat(dir)
+        if (!stat.isDirectory()) cleanupErr(`ENOTDIR: ${dir} is not a directory.`)
       } catch (err) {
-        if (err.code != "ENOENT") throw err
+        if (err.code === "ENOENT") {
+          await fs.mkdir(dir)
+        }
       }
-      pipeline(stream, fs.createWriteStream(p), async (err) => {
+    }
+
+    const p = `/${parts.join("/")}`
+    console.error(`${partitionNo}:${p}`)
+
+    if ((header.devMajor || header.devMinor) && (header.devMajor !== 0 || header.devMinor !== 0)) {
+      //TODO: add support for device file
+      console.log(`this is a device file ${header.devMajor}, ${header.devMinor}`)
+      resolve("skip device file")
+      return
+    }
+
+    switch (header.type) {
+      // should never happen for balena but might happen for other distro
+      case "directory":
+        try {
+          const stat = await fs.stat(p)
+          if (!stat.isDirectory()) cleanupErr(`EEXIST: ${p} exists and is not a directory.`)
+        } catch (err) {
+          if (err.code === "ENOENT") await fs.mkdir(p)
+          // cleanupErr(err.message)
+        }
         const fh = await fs.open(p, "r+")
         await fh.chown(header.uid, header.gid)
-        console.log(`closing ${header.mode}`)
         await fh.chmod(header.mode)
         await fh.close()
-        cleanupErr(err, next)
-      })
+        resolve(true)
+        break
+      case "symlink":
+        try {
+          const stat = await fs.lstat(p)
+          if (!stat.isSymbolicLink()) cleanupErr(`EEXIST: ${p} exists and is not a symlink`)
+          if ((await fs.readlink(p)) !== header.linkname) cleanupErr(`EEXIST: ${p} exists. If overwrite is desired, please file an issue.`)
+          resolve(true)
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            await fs.symlink(header.linkname, p)
+            // await fh.chown(header.uid, header.gid)
+            // await fh.chmod(header.mode)
+            // await fh.close()
+          } else cleanupErr(err.message)
+          resolve(true)
+        }
+        break
+
+      // most of the content should trigger this one
+      case "file":
+        try {
+          await fs.stat(p)
+          cleanupErr(`EEXIST: ${p} exists. Refusing to overwrite`)
+        } catch (err) {
+          if (err.code != "ENOENT") throw err
+        }
+        // skip problematic files
+        if (header.name.includes("__")) {
+          resolve("skipping file")
+          return
+        }
+        const writeStream = fs.createWriteStream(p)
+        stream.pipe(writeStream)
+        writeStream.on("finish", async () => {
+          writeStream.end()
+          const fh = await fs.open(p, "r+")
+          await fh.chown(header.uid, header.gid)
+          await fh.chmod(header.mode)
+          await fh.close()
+          resolve(true)
+        })
+        writeStream.on("error", (error) => {
+          cleanupErr(error)
+          reject(`file injection failed ${error.message}`)
+        })
+        break
+      case "link":
+        try {
+          const stat = await fs.lstat(p)
+          if (!stat.isLink()) cleanupErr(`EEXIST: ${p} exists and is not a symlink`)
+          if ((await fs.readlink(p)) !== header.linkname) cleanupErr(`EEXIST: ${p} exists. If overwrite is desired, please file an issue.`)
+          resolve(true)
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            // const linkname = header.linkname.includes("overlay2") ? header.linkname : `${p.split("/diff")[0]}/diff${header.linkname}`
+            //TODO: support link
+            // resolve("link not supported")
+            // shouldn't check existence
+            // await fs.link(linkname, p)
+            // await fh.chown(header.uid, header.gid)
+            // await fh.chmod(header.mode)
+            // await fh.close()
+          } else cleanupErr(err.message)
+          resolve(true)
+        }
+        break
+      default:
+        cleanupErr(`${header.type} unsupported. Please file an issue`)
+        reject("unsuported file type")
+        break
     }
-  } else {
-    cleanupErr(`${header.type} unsupported. Please file an issue`)
-  }
-}
+  })
 
 // first file in the archive should be the manifest
 const onManifest = async (_header, stream, next) => {

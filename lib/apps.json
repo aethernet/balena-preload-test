@@ -1,0 +1,57 @@
+{
+  "apps": {
+    "ed91bdb088b54a3b999576679281520a": {
+      "id": 1933815,
+      "name": "preloading-test-pi4",
+      "is_host": false,
+      "class": "fleet",
+      "releases": {
+        "2f24cd2be3006b029911a3d0da6837d5": {
+          "id": 2168707,
+          "services": {
+            "files": {
+              "id": 1575101,
+              "image_id": 4913976,
+              "image": "registry2.balena-cloud.com/v2/a42656089dcef7501aae9dae4687a2c5@sha256:0ae9a712a8c32ac04b91d659a9bc6d4bb2e76453aaf3cfaf036f279262f1f100",
+              "environment": {
+                "BROWSE_FOLDER": "/files"
+              },
+              "labels": {},
+              "composition": {
+                "restart": "always",
+                "volumes": ["files:/files"],
+                "ports": ["80"],
+                "environment": {
+                  "BROWSE_FOLDER": "/files"
+                }
+              }
+            },
+            "sdcard": {
+              "id": 1575102,
+              "image_id": 4913977,
+              "image": "registry2.balena-cloud.com/v2/5eb45ce8b915cd87865cf954a5e53129@sha256:0406bfce1cb9ccac879bdeb720228f322eab8e269cc0d846ec1843e691d7b841",
+              "environment": {},
+              "labels": {},
+              "composition": {
+                "restart": "always",
+                "privileged": true,
+                "volumes": ["files:/files"]
+              }
+            }
+          },
+          "volumes": {
+            "files": {}
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "RESIN_SUPERVISOR_DELTA_VERSION": "3",
+    "RESIN_SUPERVISOR_NATIVE_LOGGER": "true",
+    "RESIN_HOST_FIREWALL_MODE": "",
+    "RESIN_SUPERVISOR_DELTA": "1",
+    "RESIN_SUPERVISOR_POLL_INTERVAL": "900000",
+    "RESIN_SUPERVISOR_DELTA_REQUEST_TIMEOUT": "59000"
+  }
+}
