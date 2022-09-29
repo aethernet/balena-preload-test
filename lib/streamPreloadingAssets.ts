@@ -179,14 +179,12 @@ const streamPreloadingAssets = async ({
 
 	// close tarball
 	await packStream.finalize();
-	console.log('==> FINISHED @streamPreloadingAssets');
-	console.log(
-		'==> change consoleLevel log levels in logger.mjs for less verbose logging',
-	);
 
 	if (callback) {
 		callback();
 	}
+
+	return;
 };
 
 export { streamPreloadingAssets };

@@ -1,7 +1,9 @@
 import { streamPreloadingAssets } from "./lib/streamPreloadingAssets"
 import "dotenv/config"
 import fsx from "fs-extra"
-console.log('STARTING PRELOADING');
+
+const startTime = new Date().toISOString() as string;
+console.log(`PRELOADING STARTED ${startTime}`);
 
 const appId = process.env.APPID;
 const releaseId = process.env.RELEASEID
@@ -48,4 +50,8 @@ balenaosStream.on("open", async () => {
     password,
     callback: () => {},
   })
+  const endTime = new Date().toISOString() as string;
+  console.info(`==> PRELOADING start ${startTime}`);
+  console.info(`==> PRELOADING end   ${endTime}`);
+  console.info(`==> PRELOADING DONE`);
 })
