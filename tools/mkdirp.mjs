@@ -23,6 +23,8 @@ const mkdirP = (p, opts, madeIn) =>
       resolve(made)
     } catch (err) {
       switch (err.code) {
+        //FIXME: i suspect something is wrong around here
+
         // if directory does not exist; create the parent
         case "ENOENT":
           try {
