@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "preloading",
   "main": "main.mjs",
+  "types": "dist/index.d.ts",
   "scripts": {
     "start": "ts-node main.ts",
     "prettier": "balena-lint --fix lib types tools",
@@ -12,6 +13,7 @@
     "@types/gunzip-maybe": "^1.4.0",
     "@types/tar-stream": "^2.2.2",
     "axios": "^0.27.2",
+    "combined-stream": "^1.0.8",
     "digest-stream": "^2.0.0",
     "docker-parse-image": "^3.0.1",
     "dotenv": "^16.0.1",
@@ -27,6 +29,8 @@
   },
   "devDependencies": {
     "@balena/lint": "^6.2.0",
+    "@types/combined-stream": "^1.0.3",
+    "@types/pump": "^1.1.1",
     "child_process": "^1.0.2",
     "extract-zip": "^2.0.1",
     "fs-extra": "^10.1.0",
