@@ -1,3 +1,3 @@
-declare module 'docker-parse-image  ' {
+declare module 'docker-parse-image' {
   function parseImage(image: string): any
 }

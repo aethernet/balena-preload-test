@@ -2,14 +2,15 @@ import { pipeline } from "stream"
 import tar from "tar-stream"
 import { tmpdir } from "os"
 import { resolve } from 'path';
-// import * as osfs from "fs"
+import * as osfs from "fs"
 // import * as ext2fs from "ext2fs"
-// import * as FileDisk from 'file-disk'
-// import * as PartitionInfo from 'partitioninfo'
-import osfs from "fs"
+// import { ext2fs } from 'ext2fs';
+import * as FileDisk from 'file-disk'
+import * as PartitionInfo from 'partitioninfo'
+// import osfs from "fs"
 import ext2fs from "ext2fs"
-import FileDisk from 'file-disk'
-import PartitionInfo from 'partitioninfo'
+// import FileDisk from 'file-disk'
+// import PartitionInfo from 'partitioninfo'
 import zlib from "zlib"
 import {exec} from 'child_process';
 import {inspect} from 'util';
