@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "preloading",
   "main": "main.mjs",
-  "types": "dist/index.d.ts",
+  "node": "<=16.17.0",
   "scripts": {
     "start": "ts-node main.ts",
     "prettier": "balena-lint --fix lib types tools",

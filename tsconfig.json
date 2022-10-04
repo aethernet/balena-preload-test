@@ -25,8 +25,7 @@
     /* Emit */
     "sourceMap": false,                                  /* Specify a file that bundles all outputs into one JavaScript file. If 'declaration' is true, also designates a file that bundles all .d.ts output. */
     "outDir": "./dist" /* Specify an output folder for all emitted files. */,
-    "sourceRoot": "./",                                 /* Specify the root path for debuggers to find the reference source code. */
-
+  
     /* Interop Constraints */
      "esModuleInterop": true /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */,
     "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */,
@@ -37,5 +36,14 @@
     /* Completeness */
   //  "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "exclude": ["./dist/**/*", "./node_modules", "./src/**/*.test.ts", "./src/**/*.spec.ts", "./src/**/*.mjs"]
+  "exclude": ["./dist/**/*",
+    "./assets",
+    "./examples",
+    "./emsdk",
+    "./docks",
+    "./node_modules",
+    "./src/**/*.test.ts",
+    "./src/**/*.spec.ts",
+    "./src/**/*.mjs"
+  ]
 }
