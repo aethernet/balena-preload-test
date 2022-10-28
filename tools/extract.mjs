@@ -5,9 +5,9 @@
 
 import path from "path"
 import mkdirp from "./mkdirp.mjs"
-import chownr from "chownr"
+// import chownr from "chownr"
 import tar from "tar-stream"
-import pump from "pump"
+// import pump from "pump"
 
 export default function (cwd, opts) {
   if (!cwd) cwd = "."
@@ -17,11 +17,11 @@ export default function (cwd, opts) {
   var ignore = opts.ignore || noop
   var map = opts.map || noop
   var extract = tar.extract()
-  var own = true
-  var umask = typeof opts.umask === "number" ? ~opts.umask : ~processUmask()
+  // var own = true
+  // var umask = typeof opts.umask === "number" ? ~opts.umask : ~processUmask()
   var dmode = typeof opts.dmode === "number" ? opts.dmode : 0
   var fmode = typeof opts.fmode === "number" ? opts.fmode : 0
-  var strict = opts.strict !== false
+  // var strict = opts.strict !== false
 
   if (opts.readable) {
     dmode |= parseInt(555, 8)
@@ -32,8 +32,8 @@ export default function (cwd, opts) {
     fmode |= parseInt(222, 8)
   }
 
-  var chperm = function (name, header, cb) {
-    var link = header.type === "symlink"
+  const chperm = (name, header) => {
+    const link = header.type === "symlink"
 
     /* eslint-disable node/no-deprecated-api */
     // var chmod = link ? xfs.lchmod : xfs.chmod
@@ -41,7 +41,7 @@ export default function (cwd, opts) {
     /* eslint-enable node/no-deprecated-api */
 
     // if (!chmod) return cb()
-
+ 
     // var mode = (header.mode | (header.type === "directory" ? dmode : fmode)) & umask
 
     // if (chown && own) chown.call(xfs, name, header.uid, header.gid, onchown)
@@ -52,10 +52,9 @@ export default function (cwd, opts) {
     //   if (!chmod) return cb()
     //   chmod.call(xfs, name, mode).then(() => cb())
     // }
-    cb()
   }
 
-  extract.on("entry", function (header, stream, next) {
+  extract.on("entry", async function (header, stream, next) {
     if (ignore(header)) {
       stream.resume()
       return next()
@@ -63,97 +62,89 @@ export default function (cwd, opts) {
 
     header = map(header) || header
 
-    var name = path.join(cwd, path.join("/", header.name))
+    const name = path.join(cwd, path.join("/", header.name))
 
-    var stat = function (err) {
+    const stat = (err) => {
       if (err) return next(err)
-      chperm(name, header, next)
+      chperm(name, header)
+      next()
     }
 
-    var onsymlink = function () {
-      xfs.unlink(name, function () {
-        xfs.symlink(header.linkname, name, stat)
-      })
+    const onsymlink = async () => {
+      // console.log("unlinking")
+      // await xfs.unlink(name)
+      try {
+        await xfs.symlink(header.linkname, name)
+      } catch (error) {
+        console.log("error on symlink", error)
+      }
+      stat()
     }
 
-    var onlink = function () {
-      xfs.unlink(name, function () {
-        var srcpath = path.join(cwd, path.join("/", header.linkname))
-
-        xfs.link(srcpath, name, function (err) {
-          if (err && err.code === "EPERM" && opts.hardlinkAsFilesFallback) {
-            stream = xfs.createReadStream(srcpath)
-            return onfile()
-          }
-
-          stat(err)
-        })
-      })
+    const onlink = async () => {
+      // console.log("unlinking")
+      // await xfs.unlink(name)
+      const srcpath = path.join(cwd, path.join("/", header.linkname))
+      try {
+        await xfs.link(srcpath, name)
+      } catch (error) {
+        console.log("error on link", error)
+      }
+      stat()
     }
 
-    var onfile = function () {
-      console.log("onfile")
-      var ws = xfs.createWriteStream(name)
-      var rs = mapStream(stream, header)
+    const onfile = async () => {
+      try {
+        console.log("onfile")
 
-      ws.on("error", function (err) {
-        rs.destroy(err)
-      })
+        const ws = await xfs.createWriteStream(name)
+        const rs = stream
 
-      pump(rs, ws, function (err) {
-        if (err) return next(err)
-        ws.on("close", stat)
-      })
+        // ws.on("error", function (err) {
+        //   console.log("file writestream error", err)
+        //   rs.destroy(err)
+        //   reject(err)
+        // })
+
+        // rs.on("error", function (err) {
+        //   console.log("file readstream error", err)
+        //   reject(err)
+        // })
+
+      //   console.log("inject file")
+      //   ws.on("close", resolve)
+      //   rs.pipe(ws)
+      // } catch (err) {
+      //   console.log("error in file")
+      //   reject("error here")
+      // } finally {
+      //   stat()
+        next()
+      // }
+    // }
+
+    try {
+      const dir = path.dirname(name)
+      await mkdirp(dir, xfs)
+      switch (header.type) {
+        // case "directory":
+        //   return ondirectory()
+        case "file":
+          console.log("will do file")
+          return await onfile()
+        case "link":
+          console.log("will do link")
+          return await onlink()
+        case "symlink":
+          console.log("will do sym")
+          return await onsymlink()
+      }
+    } catch (error) {
+      console.log("error bim", error)
+    } finally {
+      stream.resume()
+      next()
     }
-
-    if (header.type === "directory") {
-      console.log(`mkdir`, header.name)
-      return mkdirfix(
-        name,
-        {
-          fs: xfs,
-          own: own,
-          uid: header.uid,
-          gid: header.gid,
-        },
-        stat
-      )
-    }
-
-    var dir = path.dirname(name)
-
-    validate(xfs, dir, path.join(cwd, "."), function (err, valid) {
-      if (err) return next(err)
-      if (!valid) return next(new Error(dir + " is not a valid path"))
-
-      console.log(`validate`, header.name)
-      mkdirfix(
-        dir,
-        {
-          fs: xfs,
-          own: own,
-          uid: header.uid,
-          gid: header.gid,
-        },
-        function (err) {
-          console.log("mkdirfix", err)
-          if (err) return next(err)
-          switch (header.type) {
-            case "file":
-              return onfile()
-            case "link":
-              return onlink()
-            case "symlink":
-              return onsymlink()
-          }
-
-          if (strict) return next(new Error("unsupported type for " + name + " (" + header.type + ")"))
-
-          stream.resume()
-          next()
-        }
-      )
-    })
   })
 
   if (opts.finish) extract.on("finish", opts.finish)
@@ -161,27 +152,18 @@ export default function (cwd, opts) {
   return extract
 }
 
-function validate(fs, name, root, cb) {
-  console.log(name, root)
-  if (name === root) return cb(null, true)
-  fs.lstat(name, function (err, st) {
-    console.log(err, st)
-    if (err && err.code !== "ENOENT") return cb(err)
-    if (err || st.isDirectory()) return validate(fs, path.join(name, ".."), root, cb)
-    cb(null, false)
-  })
-}
-
-async function mkdirfix(name, opts, cb) {
-  try {
-    const made = await mkdirp(name, { fs: opts.fs })
-    if (made && opts.own) {
-      chownr(made, opts.uid, opts.gid, cb)
-    }
-  } catch (err) {
-    cb(err)
-  }
-}
+// async function mkdirfix(name, opts, cb) {
+//   try {
+//     await mkdirp(name, opts.fs)
+//     if (made && opts.own) {
+//       chownr(made, opts.uid, opts.gid, cb)
+//     } else {
+//       cb()
+//     }
+//   } catch (err) {
+//     cb(err)
+//   }
+// }
 
 var processUmask = function () {
   return process.umask ? process.umask() : 0

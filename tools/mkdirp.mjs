@@ -1,56 +1,43 @@
-// forked from https://github.com/mafintosh/mkdirp-classic
-// The MIT License (MIT)
-// Copyright (c) 2020 James Halliday (mail@substack.net) and Mathias Buus
-// Forked by Edwin Joassart for Balena (2022)
+// Edwin Joassart for Balena (2022)
 
 import path from "path"
-const _0777 = parseInt("0777", 8)
 
-const mkdirP = (p, opts, madeIn) =>
+const mkdirP = (p, fs) =>
   new Promise(async (resolve, reject) => {
-    const mode = opts.mode || _0777
-    const xfs = opts.fs
-
     p = path.resolve(p)
 
-    if ((p = "/")) {
-      resolve(made)
+    // resolve if we're on root to avoid some specific error due to the device nature of /
+    if (p === "/") {
+      resolve()
+      return
     }
 
     try {
-      await xfs.mkdir(p, mode)
-      var made = madeIn || p
-      resolve(made)
+      const stat = await fs.stat(p)
+      // we got a directory, that's fine, we're good, let's get out of here
+      // maybe we need a special test here for `root`
+
+      resolve()
+      return
     } catch (err) {
-      switch (err.code) {
-        //FIXME: i suspect something is wrong around here
-
-        // if directory does not exist; create the parent
-        case "ENOENT":
-          try {
-            await mkdirP(path.dirname(p), opts)
-            await mkdirP(p, opts, made)
-          } catch (err) {
-            reject(err)
-          }
-          break
-
-        // In the case of any other error, just see if there's a dir
-        // there already.  If so, then hooray!  If not, then something
-        // is borked.
-        default:
-          try {
-            const stat = await xfs.stat(p)
-            // if the stat fails, then that's super weird.
-            // let the original error be the failure reason.
-            if (!stat.isDirectory()) reject("not a dir")
-            resolve(made)
-          } catch (err) {
-            reject(err)
-          }
-          break
-      }
+      // console.log("ENOENT")
+      // we don't have a directory, let's check the parents recursiverly until we get one
+      // if(err === "ENOENT") // we should check the error here, just in case
+      await mkdirP(path.dirname(p), fs)
     }
+
+    // we won't continue until we either gets a directory or reach root, so we now that path.dirname(p) exists
+    // and we can create the current directory p
+
+    // creating folder
+    try {
+      // console.log("creating folder", p)
+      await fs.mkdir(p, parseInt("0777", 8))
+    } catch (err) {
+      reject()
+    }
+
+    resolve()
   })
 
 export default mkdirP
