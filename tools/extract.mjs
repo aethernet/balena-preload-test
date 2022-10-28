@@ -41,7 +41,7 @@ export default function (cwd, opts) {
     /* eslint-enable node/no-deprecated-api */
 
     // if (!chmod) return cb()
- 
+
     // var mode = (header.mode | (header.type === "directory" ? dmode : fmode)) & umask
 
     // if (chown && own) chown.call(xfs, name, header.uid, header.gid, onchown)
@@ -111,60 +111,63 @@ export default function (cwd, opts) {
         //   reject(err)
         // })
 
-      //   console.log("inject file")
-      //   ws.on("close", resolve)
-      //   rs.pipe(ws)
-      // } catch (err) {
-      //   console.log("error in file")
-      //   reject("error here")
-      // } finally {
-      //   stat()
+        //   console.log("inject file")
+        //   ws.on("close", resolve)
+        //   rs.pipe(ws)
+        // } catch (err) {
+        //   console.log("error in file")
+        //   reject("error here")
+        // } finally {
+        //   stat()
         next()
-      // }
-    // }
-
-    try {
-      const dir = path.dirname(name)
-      await mkdirp(dir, xfs)
-      switch (header.type) {
-        // case "directory":
-        //   return ondirectory()
-        case "file":
-          console.log("will do file")
-          return await onfile()
-        case "link":
-          console.log("will do link")
-          return await onlink()
-        case "symlink":
-          console.log("will do sym")
-          return await onsymlink()
+        // }
+      } catch (error) {
+        console.log(error)
       }
-    } catch (error) {
-      console.log("error bim", error)
-    } finally {
-      stream.resume()
-      next()
+
+      try {
+        const dir = path.dirname(name)
+        await mkdirp(dir, xfs)
+        switch (header.type) {
+          // case "directory":
+          //   return ondirectory()
+          case "file":
+            console.log("will do file")
+            return await onfile()
+          case "link":
+            console.log("will do link")
+            return await onlink()
+          case "symlink":
+            console.log("will do sym")
+            return await onsymlink()
+        }
+      } catch (error) {
+        console.log("error bim", error)
+      } finally {
+        stream.resume()
+        next()
+      }
+
+      if (opts.finish) extract.on("finish", opts.finish)
+
+      return extract
     }
   })
 
-  if (opts.finish) extract.on("finish", opts.finish)
+  // async function mkdirfix(name, opts, cb) {
+  //   try {
+  //     await mkdirp(name, opts.fs)
+  //     if (made && opts.own) {
+  //       chownr(made, opts.uid, opts.gid, cb)
+  //     } else {
+  //       cb()
+  //     }
+  //   } catch (err) {
+  //     cb(err)
+  //   }
+  // }
 
-  return extract
-}
-
-// async function mkdirfix(name, opts, cb) {
-//   try {
-//     await mkdirp(name, opts.fs)
-//     if (made && opts.own) {
-//       chownr(made, opts.uid, opts.gid, cb)
-//     } else {
-//       cb()
-//     }
-//   } catch (err) {
-//     cb(err)
-//   }
-// }
-
-var processUmask = function () {
-  return process.umask ? process.umask() : 0
+  var processUmask = function () {
+    return process.umask ? process.umask() : 0
+  }
 }
